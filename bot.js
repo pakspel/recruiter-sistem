@@ -13,6 +13,15 @@ const client = new Client({
 });
 
 // ─────────────────────────────────────
+//  Проверка роли
+// ─────────────────────────────────────
+function hasAdminRole(member) {
+  const roleId = process.env.ADMIN_ROLE_ID;
+  if (!roleId) return member.permissions.has(PermissionFlagsBits.ManageRoles);
+  return member.roles.cache.has(roleId);
+}
+
+// ─────────────────────────────────────
 //  Slash command definitions
 // ─────────────────────────────────────
 const commands = [
@@ -28,20 +37,17 @@ const commands = [
   new SlashCommandBuilder()
     .setName('добавить_рекрута')
     .setDescription('[ADMIN] Зарегистрировать рекрута')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .addUserOption(o => o.setName('пользователь').setDescription('Пользователь').setRequired(true))
     .addStringOption(o => o.setName('имя').setDescription('Отображаемое имя').setRequired(false)),
 
   new SlashCommandBuilder()
     .setName('убрать_рекрута')
     .setDescription('[ADMIN] Удалить рекрута из системы')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .addUserOption(o => o.setName('пользователь').setDescription('Пользователь').setRequired(true)),
 
   new SlashCommandBuilder()
     .setName('баллы')
     .setDescription('[ADMIN] Добавить / снять баллы вручную')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .addUserOption(o => o.setName('пользователь').setDescription('Пользователь').setRequired(true))
     .addIntegerOption(o => o.setName('количество').setDescription('Баллы (отрицательные — снять)').setRequired(true))
     .addStringOption(o => o.setName('причина').setDescription('Причина').setRequired(false)),
@@ -88,11 +94,6 @@ async function registerCommands() {
 // ─────────────────────────────────────
 //  Helpers
 // ─────────────────────────────────────
-function getRankEmoji(points, config) {
-  const rank = storage.getRank(points, config);
-  return `${rank.emoji} ${rank.name}`;
-}
-
 function statusEmoji(status) {
   return { active: '🟢', warning: '🟡', danger: '🔴', kicked: '💀' }[status] || '⚪';
 }
@@ -133,7 +134,7 @@ function buildProfileEmbed(r, config) {
   const lastActions = (r.history || []).slice(0, 5).map(h => {
     const sign = h.delta > 0 ? `+${h.delta}` : h.delta;
     const d = new Date(h.date).toLocaleDateString('ru');
-    return `\`${d}\` ${sign > 0 ? '🔺' : '🔻'} **${sign}** — ${h.action}`;
+    return `\`${d}\` ${h.delta > 0 ? '🔺' : '🔻'} **${sign}** — ${h.action}`;
   }).join('\n') || 'Нет истории';
 
   const embed = new EmbedBuilder()
@@ -165,33 +166,26 @@ async function parseOtherBotMessage(message) {
   const scoring = config.scoring;
   const results = [];
 
-  // Find all "accepted" events
   let m;
   ACCEPT_RE.lastIndex = 0;
   while ((m = ACCEPT_RE.exec(message.content)) !== null) {
     const recruiterId = m[1];
     const candidateId = m[2];
-    const rec = storage.get(recruiterId);
-    if (!rec) continue;
-
+    if (!storage.get(recruiterId)) continue;
     storage.addPoints(recruiterId, scoring.accepted, `Принял кандидата <@${candidateId}>`, 'bot-auto');
     results.push({ recruiterId, delta: +scoring.accepted, action: 'принял заявку' });
   }
 
-  // Find all "rejected" events
   REJECT_RE.lastIndex = 0;
   while ((m = REJECT_RE.exec(message.content)) !== null) {
     const recruiterId = m[1];
     const candidateId = m[2];
-    const rec = storage.get(recruiterId);
-    if (!rec) continue;
-
+    if (!storage.get(recruiterId)) continue;
     storage.addPoints(recruiterId, scoring.rejected, `Отклонил кандидата <@${candidateId}> (поймал нарушителя)`, 'bot-auto');
     results.push({ recruiterId, delta: +scoring.rejected, action: 'отклонил заявку' });
   }
 
   if (results.length > 0) {
-    // Send a small feedback embed in the same channel
     const lines = results.map(r => {
       const rec = storage.get(r.recruiterId);
       const name = rec?.displayName || `<@${r.recruiterId}>`;
@@ -209,7 +203,7 @@ async function parseOtherBotMessage(message) {
 // ─────────────────────────────────────
 //  Event handlers
 // ─────────────────────────────────────
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   console.log(`🤖 Bot logged in as ${client.user.tag}`);
   await registerCommands();
 });
@@ -249,16 +243,20 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       case 'добавить_рекрута': {
+        if (!hasAdminRole(interaction.member))
+          return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
         const target = interaction.options.getUser('пользователь');
         const name = interaction.options.getString('имя') || target.displayName || target.username;
-        const existing = storage.get(target.id);
-        if (existing) return interaction.reply({ content: '⚠️ Этот пользователь уже в системе.', ephemeral: true });
+        if (storage.get(target.id))
+          return interaction.reply({ content: '⚠️ Этот пользователь уже в системе.', ephemeral: true });
         storage.register(target.id, target.username, name);
         await interaction.reply({ content: `✅ **${name}** добавлен как рекрут! Начальный буфер: **${config.startingBuffer}** баллов.` });
         break;
       }
 
       case 'убрать_рекрута': {
+        if (!hasAdminRole(interaction.member))
+          return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
         const target = interaction.options.getUser('пользователь');
         storage.remove(target.id);
         await interaction.reply({ content: `🗑 **${target.username}** удалён из системы.` });
@@ -266,6 +264,8 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       case 'баллы': {
+        if (!hasAdminRole(interaction.member))
+          return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
         const target = interaction.options.getUser('пользователь');
         const amount = interaction.options.getInteger('количество');
         const reason = interaction.options.getString('причина') || 'Ручное начисление';
@@ -299,6 +299,7 @@ client.on('interactionCreate', async (interaction) => {
             `**Начальный буфер:** ${config.startingBuffer} баллов`,
             `**Канал другого бота:** ${config.watchChannelId ? `<#${config.watchChannelId}>` : '—'}`,
             `**ID другого бота:** ${config.otherBotId || '—'}`,
+            `**ID admin роли:** ${process.env.ADMIN_ROLE_ID || '—'}`,
             '',
             '**Начисление баллов:**',
             `✅ Кандидат принят: +${config.scoring.accepted}`,
