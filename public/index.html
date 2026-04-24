@@ -20,6 +20,7 @@
     --amber:    #f4a261;
     --green:    #2ec27e;
     --purple:   #a78bfa;
+    --blue:     #60a5fa;
     --muted:    #555570;
     --text:     #d8d8e8;
     --dim:      #888899;
@@ -27,74 +28,56 @@
   }
 
   html { scroll-behavior: smooth; }
-
   body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Rajdhani', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: 'Rajdhani', sans-serif; min-height: 100vh; overflow-x: hidden;
   }
-
   body::before {
-    content: '';
-    position: fixed; inset: 0;
-    background-image:
-      linear-gradient(rgba(230,57,70,.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(230,57,70,.03) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none; z-index: 0;
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(230,57,70,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(230,57,70,.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
   }
 
   .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; }
 
   /* ── Header ── */
   header {
-    padding: 50px 0 40px;
-    display: flex; align-items: flex-end; justify-content: space-between;
-    gap: 20px; flex-wrap: wrap;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 40px;
+    padding: 50px 0 40px; display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 40px;
     animation: fadeDown .6s ease both;
   }
-
   .logo { display: flex; align-items: flex-end; gap: 16px; }
-
   .logo-icon {
-    width: 56px; height: 56px;
-    background: var(--red);
-    display: grid; place-items: center;
-    font-size: 28px;
+    width: 56px; height: 56px; background: var(--red);
+    display: grid; place-items: center; font-size: 28px;
     clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-    cursor: pointer;
-    transition: .2s;
-    position: relative;
+    cursor: pointer; transition: .2s; position: relative;
   }
   .logo-icon:hover { background: #c0252e; }
   .logo-icon.logged-in { background: #1a3a2a; border: 1px solid var(--green); }
   .logo-icon.logged-in::after {
     content: ''; position: absolute; bottom: 8px; right: 8px;
-    width: 8px; height: 8px; background: var(--green);
-    border-radius: 50%; box-shadow: 0 0 6px var(--green);
+    width: 8px; height: 8px; background: var(--green); border-radius: 50%; box-shadow: 0 0 6px var(--green);
   }
+
+  /* Admin badge on logo icon */
+  .logo-icon.is-admin { background: #1a1a3a; border: 1px solid var(--purple); }
+  .logo-icon.is-admin::after { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
 
   h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(32px, 6vw, 52px); letter-spacing: 3px; line-height: 1; color: var(--white); }
   h1 span { color: var(--red); }
 
   .meta {
     font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim);
-    letter-spacing: 1px; text-transform: uppercase;
-    display: flex; flex-direction: column; gap: 4px; text-align: right;
+    letter-spacing: 1px; text-transform: uppercase; display: flex; flex-direction: column; gap: 4px; text-align: right;
   }
   .meta strong { color: var(--muted); }
 
-  /* ── Filters ── */
+  /* ── Toolbar / nav strip ── */
   .toolbar {
-    display: flex; gap: 10px; flex-wrap: wrap;
-    margin-bottom: 24px;
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px;
     animation: fadeUp .5s .2s ease both;
   }
-
   .filter-btn {
     background: transparent; border: 1px solid var(--border);
     color: var(--dim); font-family: 'Rajdhani', sans-serif;
@@ -104,6 +87,18 @@
   }
   .filter-btn:hover, .filter-btn.active { background: var(--red); border-color: var(--red); color: #fff; }
   .filter-btn.curator-filter:hover, .filter-btn.curator-filter.active { background: var(--purple); border-color: var(--purple); }
+  .filter-btn.admin-btn { border-color: rgba(167,139,250,.4); color: var(--purple); }
+  .filter-btn.admin-btn:hover, .filter-btn.admin-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; }
+  .filter-btn.cabinet-btn { border-color: rgba(96,165,250,.4); color: var(--blue); }
+  .filter-btn.cabinet-btn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+  /* Pending badge */
+  .pending-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--red); color: #fff; border-radius: 50%;
+    width: 16px; height: 16px; font-size: 10px; font-weight: 700;
+    margin-left: 6px; vertical-align: middle;
+  }
 
   .spacer { flex: 1; }
   .update-info { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); align-self: center; }
@@ -111,8 +106,7 @@
   /* ── Stats ── */
   .stats-row {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px; margin-bottom: 32px;
-    animation: fadeUp .5s .1s ease both;
+    gap: 12px; margin-bottom: 32px; animation: fadeUp .5s .1s ease both;
   }
   .stat-card {
     background: var(--card); border: 1px solid var(--border); padding: 16px 20px;
@@ -142,7 +136,6 @@
   tbody tr:hover { background: rgba(230,57,70,.04); }
   tbody tr.curator-row { background: rgba(167,139,250,.03); }
   tbody tr.curator-row:hover { background: rgba(167,139,250,.07); }
-
   td { padding: 16px 16px; vertical-align: middle; font-size: 15px; font-weight: 500; }
 
   .pos { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; }
@@ -167,8 +160,7 @@
 
   .rank-badge {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 4px 12px; font-size: 12px; font-weight: 700; letter-spacing: .5px;
-    border: 1px solid;
+    padding: 4px 12px; font-size: 12px; font-weight: 700; letter-spacing: .5px; border: 1px solid;
     clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   }
   .rank-Стажёр  { color: var(--muted);   border-color: var(--muted);  }
@@ -194,7 +186,6 @@
   .s-kicked  { background: var(--muted); }
   .s-curator { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
 
-  /* Edit button */
   .edit-btn {
     background: none; border: 1px solid transparent; color: var(--muted);
     font-size: 12px; width: 28px; height: 28px; cursor: pointer;
@@ -204,7 +195,6 @@
   }
   tbody tr:hover .edit-btn { opacity: 1; }
   .edit-btn:hover { background: rgba(230,57,70,.15); border-color: var(--red); color: var(--red); }
-
   tbody tr:first-child td { background: rgba(233,196,106,.025); }
 
   .empty { text-align: center; padding: 80px 20px; color: var(--muted); }
@@ -217,9 +207,9 @@
 
   @media (max-width: 680px) { td.hide-sm, th.hide-sm { display: none; } td { padding: 12px 10px; } }
 
-  /* ── Modal ── */
+  /* ── Modal base ── */
   .overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.8);
+    position: fixed; inset: 0; background: rgba(0,0,0,.85);
     z-index: 200; display: none; align-items: center; justify-content: center;
     backdrop-filter: blur(6px);
   }
@@ -231,6 +221,7 @@
     clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
     animation: fadeUp .3s ease both;
   }
+  .modal.wide { max-width: 620px; }
 
   .modal-title {
     font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px;
@@ -246,6 +237,7 @@
     margin-bottom: -1px; transition: .15s;
   }
   .modal-tab.active { color: var(--red); border-bottom-color: var(--red); }
+  .modal-tab.purple-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
 
   .modal-form { display: none; }
   .modal-form.active { display: block; }
@@ -259,6 +251,7 @@
     clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
   }
   .form-input:focus { border-color: var(--red); }
+  select.form-input { cursor: pointer; }
 
   .modal-msg {
     font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .5px;
@@ -277,6 +270,7 @@
     margin-top: 4px;
   }
   .btn-primary:hover { opacity: .85; }
+  .btn-primary.purple { background: var(--purple); }
   .btn-ghost {
     width: 100%; background: transparent; color: var(--dim);
     font-family: 'Rajdhani', sans-serif; font-size: 13px;
@@ -298,6 +292,67 @@
 
   .edit-target { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--white); letter-spacing: 1px; margin-bottom: 20px; }
   .edit-target span { color: var(--gold); }
+
+  /* ── Admin panel styles ── */
+  .admin-section-title {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 12px; margin-top: 4px;
+  }
+
+  .pending-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+  .pending-list::-webkit-scrollbar { width: 4px; }
+  .pending-list::-webkit-scrollbar-track { background: var(--surface); }
+  .pending-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .pending-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border); padding: 10px 14px;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .pending-login { flex: 1; font-weight: 700; color: var(--white); font-size: 14px; }
+  .pending-date { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); }
+  .pending-actions { display: flex; gap: 6px; }
+  .pend-btn {
+    padding: 5px 12px; border: 1px solid; font-family: 'Rajdhani', sans-serif;
+    font-weight: 700; font-size: 12px; letter-spacing: .5px; cursor: pointer; transition: .15s;
+    clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+    background: transparent;
+  }
+  .pend-btn.approve { border-color: var(--green); color: var(--green); }
+  .pend-btn.approve:hover { background: rgba(46,194,126,.15); }
+  .pend-btn.reject { border-color: var(--red); color: var(--red); }
+  .pend-btn.reject:hover { background: rgba(230,57,70,.15); }
+
+  .empty-state {
+    text-align: center; padding: 30px 20px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted);
+  }
+
+  /* tasks in admin panel */
+  .tasks-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; margin-bottom: 16px; }
+  .tasks-list::-webkit-scrollbar { width: 4px; }
+  .tasks-list::-webkit-scrollbar-track { background: var(--surface); }
+  .tasks-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .task-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border); padding: 10px 14px;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .task-info { flex: 1; min-width: 0; }
+  .task-title-admin { font-weight: 700; color: var(--white); font-size: 14px; margin-bottom: 2px; }
+  .task-meta { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); }
+  .task-del-btn {
+    background: none; border: 1px solid rgba(230,57,70,.3); color: var(--red);
+    width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; transition: .15s; flex-shrink: 0; margin-top: 2px;
+    clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+  }
+  .task-del-btn:hover { background: rgba(230,57,70,.15); }
+
+  .form-row { display: flex; gap: 8px; }
+  .form-row .form-group { flex: 1; }
+  textarea.form-input { resize: vertical; min-height: 60px; font-size: 14px; }
 </style>
 </head>
 <body>
@@ -333,6 +388,14 @@
     <button class="filter-btn" onclick="setFilter('warning', this)">ПРЕДУПРЕЖДЕНИЕ</button>
     <button class="filter-btn" onclick="setFilter('danger', this)">ОПАСНОСТЬ</button>
     <button class="filter-btn curator-filter" onclick="setFilter('curator', this)">КУРАТОРЫ</button>
+    <!-- Admin button — shown only for admins -->
+    <button class="filter-btn admin-btn" id="adminPanelBtn" style="display:none" onclick="openAdminPanel()">
+      ⚙ АДМИН<span class="pending-badge" id="pendingBadge" style="display:none">0</span>
+    </button>
+    <!-- Cabinet link — shown for recruits -->
+    <a href="/cabinet.html" class="filter-btn cabinet-btn" id="cabinetBtn" style="display:none;text-decoration:none">
+      📋 МОЙ КАБИНЕТ
+    </a>
     <div class="spacer"></div>
     <span class="update-info" id="refreshInfo">Обновление каждые 30с</span>
   </div>
@@ -369,14 +432,12 @@
       <button class="modal-tab" onclick="switchTab('register')">РЕГИСТРАЦИЯ</button>
     </div>
     <div class="modal-msg" id="authMsg"></div>
-
     <div class="modal-form active" id="loginForm">
       <div class="form-group"><label class="form-label">Логин</label><input class="form-input" id="loginUser" placeholder="Введи логин"></div>
       <div class="form-group"><label class="form-label">Пароль</label><input class="form-input" type="password" id="loginPass" placeholder="Введи пароль"></div>
       <button class="btn-primary" onclick="doLogin()">ВОЙТИ</button>
       <button class="btn-ghost" onclick="closeOverlay('authOverlay')">ОТМЕНА</button>
     </div>
-
     <div class="modal-form" id="registerForm">
       <div class="form-group"><label class="form-label">Логин</label><input class="form-input" id="regUser" placeholder="Придумай логин"></div>
       <div class="form-group"><label class="form-label">Пароль</label><input class="form-input" type="password" id="regPass" placeholder="Минимум 6 символов"></div>
@@ -424,6 +485,57 @@
   </div>
 </div>
 
+<!-- ADMIN PANEL -->
+<div class="overlay" id="adminOverlay">
+  <div class="modal wide">
+    <div class="modal-title">⚙ ПАНЕЛЬ АДМИНИСТРАТОРА</div>
+    <div class="modal-sub">УПРАВЛЕНИЕ СИСТЕМОЙ · ТОЛЬКО ДЛЯ АДМИНИСТРАТОРОВ</div>
+    <div class="modal-tabs">
+      <button class="modal-tab purple-tab active" onclick="switchAdminTab('pending')">
+        ЗАЯВКИ<span class="pending-badge" id="pendingBadge2" style="display:none">0</span>
+      </button>
+      <button class="modal-tab purple-tab" onclick="switchAdminTab('tasks')">ЗАДАНИЯ</button>
+    </div>
+
+    <!-- Pending approvals tab -->
+    <div class="modal-form active" id="adminPendingForm">
+      <div class="modal-msg" id="pendingMsg"></div>
+      <div class="admin-section-title">ЗАЯВКИ НА РЕГИСТРАЦИЮ</div>
+      <div class="pending-list" id="pendingList">
+        <div class="empty-state">Загрузка...</div>
+      </div>
+      <button class="btn-ghost" style="margin-top:16px" onclick="loadPending()">↻ ОБНОВИТЬ</button>
+    </div>
+
+    <!-- Tasks tab -->
+    <div class="modal-form" id="adminTasksForm">
+      <div class="modal-msg" id="tasksAdminMsg"></div>
+      <div class="admin-section-title">СУЩЕСТВУЮЩИЕ ЗАДАНИЯ</div>
+      <div class="tasks-list" id="adminTasksList">
+        <div class="empty-state">Загрузка...</div>
+      </div>
+      <div class="admin-section-title" style="margin-top:8px">СОЗДАТЬ ЗАДАНИЕ</div>
+      <div class="form-group">
+        <label class="form-label">Название</label>
+        <input class="form-input" id="taskTitle" placeholder="Название задания">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Описание (необязательно)</label>
+        <textarea class="form-input" id="taskDesc" placeholder="Подробное описание..." rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Назначить</label>
+        <select class="form-input" id="taskAssign">
+          <option value="all">👥 Всем рекрутам</option>
+        </select>
+      </div>
+      <button class="btn-primary purple" onclick="createTask()">СОЗДАТЬ ЗАДАНИЕ</button>
+    </div>
+
+    <button class="btn-ghost" style="margin-top:16px" onclick="closeOverlay('adminOverlay')">ЗАКРЫТЬ</button>
+  </div>
+</div>
+
 <script>
 let allData = [];
 let filter = 'all';
@@ -461,7 +573,6 @@ function updateStats() {
   const active  = nonCurators.filter(r => r.status === 'active').length;
   const danger  = nonCurators.filter(r => r.status === 'danger' || r.status === 'warning').length;
   const top     = nonCurators.length ? Math.max(...nonCurators.map(r => r.points)) : 0;
-
   document.getElementById('statTotal').textContent    = nonCurators.length;
   document.getElementById('statActive').textContent   = active;
   document.getElementById('statDanger').textContent   = danger;
@@ -495,8 +606,6 @@ function getFiltered() {
   let d = allData.slice();
   if (filter === 'curator') d = d.filter(r => isCurator(r));
   else if (filter !== 'all') d = d.filter(r => !isCurator(r) && r.status === filter);
-  else d = d.filter(r => true);
-
   d.sort((a, b) => {
     let va = a[sortKey], vb = b[sortKey];
     if (sortKey === 'rank') { va = RANK_ORDER[a.rank?.name] ?? 0; vb = RANK_ORDER[b.rank?.name] ?? 0; }
@@ -524,15 +633,12 @@ function render() {
     return;
   }
 
-  // For ranking, only count non-curators
   const nonCurSorted = allData.filter(r => !isCurator(r)).sort((a,b) => b.points - a.points);
   const maxPts = Math.max(...nonCurSorted.map(r => r.points), 1);
-  let ncIdx = 0;
 
   tbody.innerHTML = data.map((r, idx) => {
     const cur = isCurator(r);
     const rank = r.rank || { name: 'Стажёр', emoji: '🔰' };
-
     let posLabel, posClass, rowClass = '';
     if (cur) {
       posLabel = '🛡'; posClass = 'pos-cur'; rowClass = 'curator-row';
@@ -541,16 +647,13 @@ function render() {
       posLabel = MEDALS[gi-1] ?? gi;
       posClass = gi <= 3 ? `pos-${gi}` : '';
     }
-
     const initials = (r.displayName || r.username || '?').slice(0, 2).toUpperCase();
     const pct = cur ? 100 : Math.min(100, (r.points / maxPts) * 100);
     const bColor = cur ? '#a78bfa' : bufferColor(r.points);
-
     const weeks = Array.from({ length: 4 }, (_, i) => {
       const on = (r.weeklyActivity || [])[i];
       return `<div class="week-dot ${on ? 'on' : 'off'}"></div>`;
     }).join('');
-
     const statusMap = {
       active:  ['s-active',  'АКТИВЕН'],
       warning: ['s-warning', 'ПРЕДУПР'],
@@ -559,11 +662,9 @@ function render() {
       curator: ['s-curator', 'КУРАТОР'],
     };
     const [sCls, sLabel] = cur ? ['s-curator','КУРАТОР'] : (statusMap[r.status] || ['s-kicked','—']);
-
     const editBtn = showEdit
       ? `<button class="edit-btn" onclick="openEdit('${r.discordId}','${esc(r.displayName||r.username)}')">✏</button>`
       : '';
-
     return `
     <tr class="${rowClass}" style="animation-delay:${idx*40}ms">
       <td class="pos ${posClass}">${posLabel}</td>
@@ -600,6 +701,7 @@ function esc(str) {
 function handleAuthClick() {
   if (authToken) {
     document.getElementById('menuTitle').textContent = '☠ ' + (authUser?.login || 'ДОСТУП');
+    document.getElementById('menuSub').textContent = authUser?.role === 'admin' ? 'АДМИНИСТРАТОР' : 'РЕКРУТ';
     document.getElementById('menuMsg').className = 'modal-msg';
     document.getElementById('oldPass').value = '';
     document.getElementById('newPass').value = '';
@@ -613,16 +715,33 @@ function handleAuthClick() {
 function updateAuthUI() {
   const icon = document.getElementById('authIcon');
   const meta = document.getElementById('authMeta');
+  const adminBtn = document.getElementById('adminPanelBtn');
+  const cabinetBtn = document.getElementById('cabinetBtn');
+
   if (authUser) {
-    icon.classList.add('logged-in');
+    const isAdmin = authUser.role === 'admin';
+    const isRecruiter = authUser.role === 'recruiter';
+
+    icon.classList.toggle('logged-in', true);
+    icon.classList.toggle('is-admin', isAdmin);
     icon.title = authUser.login + ' · нажми для управления';
-    meta.textContent = '● ' + authUser.login;
+    meta.textContent = (isAdmin ? '⚙ ' : '● ') + authUser.login;
+    meta.style.color = isAdmin ? 'var(--purple)' : 'var(--green)';
     meta.style.display = '';
     document.getElementById('editCol').style.display = '';
+
+    // Show admin panel button only for admins
+    adminBtn.style.display = isAdmin ? '' : 'none';
+    // Show cabinet button only for recruits
+    cabinetBtn.style.display = isRecruiter ? '' : 'none';
+
+    if (isAdmin) loadPendingCount();
   } else {
-    icon.classList.remove('logged-in');
+    icon.classList.remove('logged-in', 'is-admin');
     icon.title = 'Авторизация';
     meta.style.display = 'none';
+    adminBtn.style.display = 'none';
+    cabinetBtn.style.display = 'none';
   }
   render();
 }
@@ -648,7 +767,7 @@ async function doLogin() {
   if (!login || !password) return showMsg('authMsg','ЗАПОЛНИ ВСЕ ПОЛЯ','error');
   const r = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password})});
   const d = await r.json();
-  if (d.pending) return showMsg('authMsg','ОЖИДАЙ ОДОБРЕНИЯ РАЗРАБОТЧИКА','info');
+  if (d.pending) return showMsg('authMsg','ОЖИДАЙ ОДОБРЕНИЯ АДМИНИСТРАТОРА','info');
   if (!d.ok) return showMsg('authMsg', (d.error||'ОШИБКА').toUpperCase(),'error');
   authToken = d.token; authUser = {login: d.login, role: d.role};
   localStorage.setItem('authToken', authToken);
@@ -664,7 +783,7 @@ async function doRegister() {
   const r = await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password})});
   const d = await r.json();
   if (!d.ok) return showMsg('authMsg',(d.error||'ОШИБКА').toUpperCase(),'error');
-  showMsg('authMsg','ЗАЯВКА ОТПРАВЛЕНА · ОЖИДАЙ ОДОБРЕНИЯ','success');
+  showMsg('authMsg','ЗАЯВКА ОТПРАВЛЕНА · ОЖИДАЙ ОДОБРЕНИЯ АДМИНИСТРАТОРА','success');
   setTimeout(()=>switchTab('login'),2500);
 }
 
@@ -710,8 +829,7 @@ async function doEditPoints() {
   const reason = document.getElementById('editReason').value.trim() || 'Ручное начисление';
   if (!amount || amount <= 0) return showMsg('editMsg','ВВЕДИ КОЛИЧЕСТВО БАЛЛОВ','error');
   const r = await fetch('/api/points',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','x-token':authToken},
+    method:'POST', headers:{'Content-Type':'application/json','x-token':authToken},
     body:JSON.stringify({userId:editTargetId, amount:amount*editSign, reason})
   });
   const d = await r.json();
@@ -720,12 +838,194 @@ async function doEditPoints() {
   fetchData();
 }
 
-// Close on overlay click
+// ── Admin panel ───────────────────────────────────────────
+
+let adminTabActive = 'pending';
+
+function openAdminPanel() {
+  openOverlay('adminOverlay');
+  switchAdminTab('pending');
+  loadPending();
+}
+
+function switchAdminTab(tab) {
+  adminTabActive = tab;
+  document.querySelectorAll('#adminOverlay .modal-tab').forEach((t, i) => {
+    t.classList.toggle('active', (tab==='pending'&&i===0)||(tab==='tasks'&&i===1));
+  });
+  document.getElementById('adminPendingForm').classList.toggle('active', tab==='pending');
+  document.getElementById('adminTasksForm').classList.toggle('active', tab==='tasks');
+  if (tab === 'tasks') { loadAdminTasks(); loadRecruitersForSelect(); }
+  if (tab === 'pending') loadPending();
+}
+
+async function loadPendingCount() {
+  try {
+    const r = await fetch('/api/admin/pending', {headers:{'x-token':authToken}});
+    if (!r.ok) return;
+    const list = await r.json();
+    const badge1 = document.getElementById('pendingBadge');
+    const badge2 = document.getElementById('pendingBadge2');
+    if (list.length > 0) {
+      badge1.textContent = list.length; badge1.style.display = '';
+      badge2.textContent = list.length; badge2.style.display = '';
+    } else {
+      badge1.style.display = 'none';
+      badge2.style.display = 'none';
+    }
+  } catch {}
+}
+
+async function loadPending() {
+  const list = document.getElementById('pendingList');
+  list.innerHTML = '<div class="empty-state">Загрузка...</div>';
+  document.getElementById('pendingMsg').className = 'modal-msg';
+  try {
+    const r = await fetch('/api/admin/pending', {headers:{'x-token':authToken}});
+    const data = await r.json();
+    if (!data.length) {
+      list.innerHTML = '<div class="empty-state">✓ Нет ожидающих заявок</div>';
+      loadPendingCount();
+      return;
+    }
+    list.innerHTML = data.map(u => `
+      <div class="pending-item" id="pend-${u.login}">
+        <div class="pending-info">
+          <div class="pending-login">${esc(u.login)}</div>
+          <div class="pending-date">${new Date(u.createdAt).toLocaleString('ru')}</div>
+        </div>
+        <div class="pending-actions">
+          <button class="pend-btn approve" onclick="approveUser('${esc(u.login)}')">✓ ПРИНЯТЬ</button>
+          <button class="pend-btn reject" onclick="rejectUser('${esc(u.login)}')">✕ ОТКЛОНИТЬ</button>
+        </div>
+      </div>
+    `).join('');
+    loadPendingCount();
+  } catch(e) {
+    list.innerHTML = '<div class="empty-state" style="color:var(--red)">Ошибка загрузки</div>';
+  }
+}
+
+async function approveUser(login) {
+  const r = await fetch('/api/admin/approve', {
+    method:'POST', headers:{'Content-Type':'application/json','x-token':authToken},
+    body: JSON.stringify({login, role:'recruiter'})
+  });
+  const d = await r.json();
+  if (d.ok) {
+    const el = document.getElementById('pend-' + login);
+    if (el) { el.style.opacity = '.4'; el.style.pointerEvents = 'none'; }
+    showMsg('pendingMsg', `✓ ${login} ОДОБРЕН КАК РЕКРУТ`, 'success');
+    setTimeout(loadPending, 1200);
+  } else {
+    showMsg('pendingMsg', 'ОШИБКА ОДОБРЕНИЯ', 'error');
+  }
+}
+
+async function rejectUser(login) {
+  if (!confirm(`Отклонить и удалить заявку от ${login}?`)) return;
+  const r = await fetch('/api/admin/reject', {
+    method:'POST', headers:{'Content-Type':'application/json','x-token':authToken},
+    body: JSON.stringify({login})
+  });
+  const d = await r.json();
+  if (d.ok) {
+    const el = document.getElementById('pend-' + login);
+    if (el) el.remove();
+    showMsg('pendingMsg', `✕ ${login} ОТКЛОНЁН И УДАЛЁН`, 'info');
+    loadPendingCount();
+  } else {
+    showMsg('pendingMsg', 'ОШИБКА ОТКЛОНЕНИЯ', 'error');
+  }
+}
+
+// ── Admin tasks ───────────────────────────────────────────
+
+async function loadAdminTasks() {
+  const list = document.getElementById('adminTasksList');
+  list.innerHTML = '<div class="empty-state">Загрузка...</div>';
+  try {
+    const r = await fetch('/api/admin/tasks', {headers:{'x-token':authToken}});
+    const tasks = await r.json();
+    if (!tasks.length) {
+      list.innerHTML = '<div class="empty-state">Заданий пока нет</div>';
+      return;
+    }
+    list.innerHTML = tasks.map(t => `
+      <div class="task-item" id="task-${t.id}">
+        <div class="task-info">
+          <div class="task-title-admin">${esc(t.title)}</div>
+          <div class="task-meta">
+            ${t.assignedTo === 'all' ? '👥 Все рекруты' : '👤 ' + esc(t.assignedTo)} ·
+            Выполнено: ${t.completedBy.length} ·
+            ${new Date(t.createdAt).toLocaleDateString('ru')}
+          </div>
+          ${t.description ? `<div class="task-meta" style="margin-top:2px;color:var(--dim)">${esc(t.description)}</div>` : ''}
+        </div>
+        <button class="task-del-btn" onclick="deleteTask('${t.id}')" title="Удалить">✕</button>
+      </div>
+    `).join('');
+  } catch {
+    list.innerHTML = '<div class="empty-state" style="color:var(--red)">Ошибка загрузки</div>';
+  }
+}
+
+async function loadRecruitersForSelect() {
+  const sel = document.getElementById('taskAssign');
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="all">👥 Всем рекрутам</option>';
+  try {
+    const r = await fetch('/api/admin/recruiters', {headers:{'x-token':authToken}});
+    const recs = await r.json();
+    recs.forEach(rec => {
+      const opt = document.createElement('option');
+      opt.value = rec.login;
+      opt.textContent = '👤 ' + rec.login;
+      sel.appendChild(opt);
+    });
+    if (currentVal) sel.value = currentVal;
+  } catch {}
+}
+
+async function createTask() {
+  const title = document.getElementById('taskTitle').value.trim();
+  const desc = document.getElementById('taskDesc').value.trim();
+  const assignedTo = document.getElementById('taskAssign').value;
+  if (!title) return showMsg('tasksAdminMsg','УКАЖИ НАЗВАНИЕ ЗАДАНИЯ','error');
+  const r = await fetch('/api/admin/tasks', {
+    method:'POST', headers:{'Content-Type':'application/json','x-token':authToken},
+    body: JSON.stringify({title, description: desc, assignedTo})
+  });
+  const d = await r.json();
+  if (d.id) {
+    showMsg('tasksAdminMsg', `✓ ЗАДАНИЕ "${esc(title)}" СОЗДАНО`, 'success');
+    document.getElementById('taskTitle').value = '';
+    document.getElementById('taskDesc').value = '';
+    document.getElementById('taskAssign').value = 'all';
+    loadAdminTasks();
+  } else {
+    showMsg('tasksAdminMsg', d.error || 'ОШИБКА', 'error');
+  }
+}
+
+async function deleteTask(id) {
+  if (!confirm('Удалить это задание?')) return;
+  const r = await fetch(`/api/admin/tasks/${id}`, {method:'DELETE', headers:{'x-token':authToken}});
+  const d = await r.json();
+  if (d.ok) {
+    const el = document.getElementById('task-' + id);
+    if (el) el.remove();
+  } else {
+    showMsg('tasksAdminMsg', 'ОШИБКА УДАЛЕНИЯ', 'error');
+  }
+}
+
+// ── Utils ─────────────────────────────────────────────────
+
 document.querySelectorAll('.overlay').forEach(o=>{
   o.addEventListener('click', e=>{ if(e.target===o) closeOverlay(o.id); });
 });
 
-// Enter key
 document.addEventListener('keydown', e=>{
   if(e.key!=='Enter') return;
   if(document.getElementById('authOverlay').classList.contains('open')) {
@@ -734,12 +1034,12 @@ document.addEventListener('keydown', e=>{
   if(document.getElementById('editOverlay').classList.contains('open')) doEditPoints();
 });
 
-// Verify token
+// Verify token on load
 if (authToken) {
   fetch('/api/auth/me',{headers:{'x-token':authToken}})
     .then(r=>r.ok?r.json():null)
     .then(d=>{
-      if(d){ authUser={login:d.login,role:d.role}; }
+      if(d){ authUser={login:d.login,role:d.role}; localStorage.setItem('authUser', JSON.stringify(authUser)); }
       else { authToken=null; authUser=null; localStorage.removeItem('authToken'); localStorage.removeItem('authUser'); }
       updateAuthUI();
     }).catch(()=>updateAuthUI());
@@ -749,6 +1049,8 @@ if (authToken) {
 
 fetchData();
 setInterval(fetchData, 30000);
+// Refresh pending count every 60s for admins
+setInterval(()=>{ if(authUser?.role==='admin') loadPendingCount(); }, 60000);
 </script>
 </body>
 </html>
