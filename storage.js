@@ -10,6 +10,7 @@ const DEFAULT_DATA = {
   recruiters: {},
   users: {},
   tokens: {},
+  tasks: {},
   config: {
     weeklyBurn: 5,
     startingBuffer: 20,
@@ -43,6 +44,7 @@ function load() {
     const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     if (!d.users)  d.users  = {};
     if (!d.tokens) d.tokens = {};
+    if (!d.tasks)  d.tasks  = {};
     return d;
   } catch {
     return JSON.parse(JSON.stringify(DEFAULT_DATA));
@@ -63,13 +65,8 @@ function isCurator(points) {
 
 // ── Recruiter helpers ──────────────────────────────────────
 
-function getAll() {
-  return load().recruiters;
-}
-
-function get(userId) {
-  return load().recruiters[userId] || null;
-}
+function getAll() { return load().recruiters; }
+function get(userId) { return load().recruiters[userId] || null; }
 
 function register(userId, username, displayName) {
   const data = load();
@@ -93,16 +90,12 @@ function register(userId, username, displayName) {
 function addPoints(userId, amount, reason, actorId = null) {
   const data = load();
   if (!data.recruiters[userId]) return null;
-
   const rec = data.recruiters[userId];
   rec.points = Math.max(0, rec.points + amount);
   if (amount > 0) rec.totalEarned = (rec.totalEarned || 0) + amount;
-
   rec.history = rec.history || [];
   rec.history.unshift({ date: new Date().toISOString(), action: reason, delta: amount, actorId });
   rec.history = rec.history.slice(0, 50);
-
-  // Curator — no status changes from points
   if (!isCurator(rec.points)) {
     if (rec.points <= 0)       rec.status = 'kicked';
     else if (rec.points <= 5)  rec.status = 'danger';
@@ -111,7 +104,6 @@ function addPoints(userId, amount, reason, actorId = null) {
   } else {
     rec.status = 'curator';
   }
-
   save(data);
   return rec;
 }
@@ -122,9 +114,7 @@ function remove(userId) {
   save(data);
 }
 
-function getConfig() {
-  return load().config;
-}
+function getConfig() { return load().config; }
 
 function setConfig(updates) {
   const data = load();
@@ -136,9 +126,7 @@ function setConfig(updates) {
 function getRank(points, config) {
   const ranks = config.ranks;
   let rank = ranks[0];
-  for (const r of ranks) {
-    if (points >= r.min) rank = r;
-  }
+  for (const r of ranks) { if (points >= r.min) rank = r; }
   return rank;
 }
 
@@ -146,36 +134,23 @@ function doWeeklyBurn() {
   const data = load();
   const burn = data.config.weeklyBurn || 5;
   const results = { burned: [], kicked: [], skippedCurators: [] };
-
   for (const [id, rec] of Object.entries(data.recruiters)) {
     if (rec.status === 'kicked') continue;
-
-    // Кураторы — пропускаем списание
     if (isCurator(rec.points) || rec.status === 'curator') {
-      results.skippedCurators.push(id);
-      continue;
+      results.skippedCurators.push(id); continue;
     }
-
     const wasActive = rec.totalEarned !== (rec._prevEarned || 0);
     rec.weeklyActivity = [wasActive, ...(rec.weeklyActivity || [])].slice(0, 8);
     rec._prevEarned = rec.totalEarned;
-
     rec.points = Math.max(0, rec.points - burn);
     rec.history = rec.history || [];
-    rec.history.unshift({
-      date: new Date().toISOString(),
-      action: `Еженедельное списание (-${burn})`,
-      delta: -burn,
-      actorId: 'system'
-    });
+    rec.history.unshift({ date: new Date().toISOString(), action: `Еженедельное списание (-${burn})`, delta: -burn, actorId: 'system' });
     rec.history = rec.history.slice(0, 50);
-
     if (rec.points <= 0)       { rec.status = 'kicked';  results.kicked.push(id); }
     else if (rec.points <= 5)  { rec.status = 'danger';  results.burned.push(id); }
     else if (rec.points <= 10) { rec.status = 'warning'; }
     else                        { rec.status = 'active';  }
   }
-
   data.lastWeeklyBurn = new Date().toISOString();
   save(data);
   return results;
@@ -187,7 +162,7 @@ function seedAdmin(login, password) {
   const data = load();
   if (!data.users[login.toLowerCase()]) {
     data.users[login.toLowerCase()] = {
-      login: login,
+      login,
       passwordHash: hashPassword(password),
       approved: true,
       role: 'admin',
@@ -206,7 +181,7 @@ function registerUser(login, password) {
     login,
     passwordHash: hashPassword(password),
     approved: false,
-    role: 'user',
+    role: 'recruiter',
     createdAt: new Date().toISOString()
   };
   save(data);
@@ -219,8 +194,6 @@ function loginUser(login, password) {
   if (!user) return { ok: false, error: 'Неверный логин или пароль' };
   if (user.passwordHash !== hashPassword(password)) return { ok: false, error: 'Неверный логин или пароль' };
   if (!user.approved) return { ok: false, error: 'pending', pending: true };
-
-  // Generate session token
   const token = crypto.randomBytes(32).toString('hex');
   data.tokens[token] = { login: user.login, role: user.role, createdAt: Date.now() };
   save(data);
@@ -232,7 +205,6 @@ function validateToken(token) {
   const data = load();
   const t = data.tokens[token];
   if (!t) return null;
-  // Token expires in 30 days
   if (Date.now() - t.createdAt > 30 * 24 * 60 * 60 * 1000) {
     delete data.tokens[token];
     save(data);
@@ -250,9 +222,37 @@ function approveUser(login) {
   return true;
 }
 
+function approveUserWithRole(login, role) {
+  const data = load();
+  const user = data.users[login.toLowerCase()];
+  if (!user) return false;
+  user.approved = true;
+  user.role = role || 'recruiter';
+  save(data);
+  return true;
+}
+
+function rejectUser(login) {
+  const data = load();
+  const key = login.toLowerCase();
+  if (!data.users[key]) return false;
+  delete data.users[key];
+  save(data);
+  return true;
+}
+
 function getPendingUsers() {
   const data = load();
-  return Object.values(data.users).filter(u => !u.approved).map(u => ({ login: u.login, createdAt: u.createdAt }));
+  return Object.values(data.users)
+    .filter(u => !u.approved)
+    .map(u => ({ login: u.login, createdAt: u.createdAt }));
+}
+
+function getRecruiters() {
+  const data = load();
+  return Object.values(data.users)
+    .filter(u => u.approved && u.role === 'recruiter')
+    .map(u => ({ login: u.login, createdAt: u.createdAt }));
 }
 
 function changePassword(login, oldPassword, newPassword) {
@@ -265,9 +265,71 @@ function changePassword(login, oldPassword, newPassword) {
   return { ok: true };
 }
 
+// ── Tasks ─────────────────────────────────────────────────
+
+function createTask(title, description, assignedTo) {
+  const data = load();
+  if (!data.tasks) data.tasks = {};
+  const id = crypto.randomBytes(8).toString('hex');
+  data.tasks[id] = {
+    id,
+    title,
+    description: description || '',
+    assignedTo: assignedTo || 'all',
+    createdAt: new Date().toISOString(),
+    completedBy: []
+  };
+  save(data);
+  return data.tasks[id];
+}
+
+function getAllTasks() {
+  const data = load();
+  if (!data.tasks) return [];
+  return Object.values(data.tasks).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+function getTasksForUser(login) {
+  const data = load();
+  if (!data.tasks) return [];
+  return Object.values(data.tasks)
+    .filter(t => t.assignedTo === 'all' || t.assignedTo === login)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+function completeTask(taskId, login) {
+  const data = load();
+  if (!data.tasks || !data.tasks[taskId]) return null;
+  const task = data.tasks[taskId];
+  if (!task.completedBy.includes(login)) {
+    task.completedBy.push(login);
+    save(data);
+  }
+  return task;
+}
+
+function uncompleteTask(taskId, login) {
+  const data = load();
+  if (!data.tasks || !data.tasks[taskId]) return null;
+  const task = data.tasks[taskId];
+  task.completedBy = task.completedBy.filter(l => l !== login);
+  save(data);
+  return task;
+}
+
+function deleteTask(taskId) {
+  const data = load();
+  if (!data.tasks || !data.tasks[taskId]) return false;
+  delete data.tasks[taskId];
+  save(data);
+  return true;
+}
+
 module.exports = {
   load, save, getAll, get, register, addPoints, remove,
   getConfig, setConfig, getRank, doWeeklyBurn, isCurator,
-  seedAdmin, registerUser, loginUser, validateToken, approveUser,
-  getPendingUsers, changePassword, hashPassword
+  seedAdmin, registerUser, loginUser, validateToken,
+  approveUser, approveUserWithRole, rejectUser,
+  getPendingUsers, getRecruiters, changePassword, hashPassword,
+  createTask, getAllTasks, getTasksForUser, completeTask, uncompleteTask, deleteTask
 };
