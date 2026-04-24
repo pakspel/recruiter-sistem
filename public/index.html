@@ -223,46 +223,58 @@
 </div>
 
 <script>
-  const MAX_BUF = 40;
   let allData = [];
   let currentFilter = 'all';
   let sortKey = 'points';
   let sortDir = -1;
 
   const RANKS = [
-    { min: 80, label: 'Элита',  cls: 'rb-elite'   },
-    { min: 45, label: 'Агент',  cls: 'rb-agent'   },
-    { min: 15, label: 'Рекрут', cls: 'rb-recruit' },
-    { min: 0,  label: 'Стажёр', cls: 'rb-trainee' },
+    { min: 150, label: 'Элита',  cls: 'rb-elite'   },
+    { min: 75,  label: 'Агент',  cls: 'rb-agent'   },
+    { min: 30,  label: 'Рекрут', cls: 'rb-recruit' },
+    { min: 0,   label: 'Стажёр', cls: 'rb-trainee' },
   ];
 
   function getRank(pts) { return RANKS.find(r => pts >= r.min) || RANKS[3]; }
 
-  function bufClass(buf) {
-    const p = buf / MAX_BUF;
+  function bufClass(pts, max) {
+    const p = pts / Math.max(max, 1);
     return p > 0.5 ? 'buf-high' : p > 0.2 ? 'buf-mid' : 'buf-low';
   }
 
-  function statusCls(s) {
-    return { active: 's-active', warn: 's-warn', inactive: 's-inactive' }[s] || 's-inactive';
-  }
-  function statusLabel(s) {
-    return { active: 'Активен', warn: 'Под угрозой', inactive: 'Неактивен' }[s] || s;
+  // Наш API возвращает: active, warning, danger, kicked
+  // Фильтры в HTML: active, warn, inactive
+  function toFilterStatus(s) {
+    if (s === 'active')  return 'active';
+    if (s === 'warning' || s === 'danger') return 'warn';
+    return 'inactive';
   }
 
-  // Fake weekly dots based on last activity (visual only)
+  function statusCls(s) {
+    return { active: 's-active', warn: 's-warn', inactive: 's-inactive' }[toFilterStatus(s)] || 's-inactive';
+  }
+  function statusLabel(s) {
+    return { active: 'Активен', warning: 'Предупреждение', danger: 'Под угрозой', kicked: 'Удалён' }[s] || s;
+  }
+
   function weekDots(row) {
-    const pts = row.points;
-    const arr = pts > 60 ? [1,1,1,2,0] : pts > 30 ? [1,1,2,0,0] : pts > 10 ? [1,2,0,0,0] : [0,0,0,0,2];
+    const weeks = row.weeklyActivity || [];
+    const arr = [0,1,2,3,4].map(i => {
+      if (i === 0) return 2; // текущая неделя
+      return weeks[i] ? 1 : 0;
+    });
     return arr.map(v => `<div class="dot ${v===1?'d-ok':v===2?'d-cur':'d-miss'}"></div>`).join('');
   }
 
   function render() {
     let data = [...allData];
-    if (currentFilter !== 'all') data = data.filter(r => r.status === currentFilter);
+
+    if (currentFilter === 'active')   data = data.filter(r => toFilterStatus(r.status) === 'active');
+    if (currentFilter === 'warn')     data = data.filter(r => toFilterStatus(r.status) === 'warn');
+    if (currentFilter === 'inactive') data = data.filter(r => toFilterStatus(r.status) === 'inactive');
 
     data.sort((a, b) => {
-      if (sortKey === 'name') return sortDir * a.username.localeCompare(b.username);
+      if (sortKey === 'name') return sortDir * (a.displayName || a.username).localeCompare(b.displayName || b.username);
       const av = parseFloat(a[sortKey]) || 0;
       const bv = parseFloat(b[sortKey]) || 0;
       return sortDir * (av - bv);
@@ -274,34 +286,42 @@
       return;
     }
 
-    // Global rank by points for top 1-2-3 coloring
+    const maxPts = Math.max(...allData.map(r => r.points), 1);
     const ranked = [...allData].sort((a,b) => b.points - a.points);
 
     tbody.innerHTML = data.map(row => {
-      const globalRank = ranked.findIndex(r => r.discord_id === row.discord_id) + 1;
+      const globalRank = ranked.findIndex(r => r.discordId === row.discordId) + 1;
       const topCls = globalRank === 1 ? 'top1' : globalRank === 2 ? 'top2' : globalRank === 3 ? 'top3' : '';
       const rnLabel = globalRank === 1 ? '①' : globalRank === 2 ? '②' : globalRank === 3 ? '③' : globalRank;
       const rank = getRank(+row.points);
-      const pct = Math.round((+row.buffer_pts / MAX_BUF) * 100);
+      const pct = Math.round((row.points / maxPts) * 100);
+      const name = row.displayName || row.username || '—';
+      const tag = (row.discordId || '0000').slice(-4);
+      const accepted = row.totalEarned || 0;
+
       return `
         <tr class="${topCls}">
           <td><span class="rn">${rnLabel}</span></td>
           <td class="name-cell">
-            <div class="name">${row.username}</div>
-            <div class="tag">#${row.discord_id.slice(-4)}</div>
+            <div class="name">${esc(name)}</div>
+            <div class="tag">#${tag}</div>
           </td>
           <td><span class="rbadge ${rank.cls}">${rank.label}</span></td>
           <td><span class="pts">${row.points}</span></td>
           <td>
             <div class="buf-cell">
-              <div class="buf-track"><div class="buf-fill ${bufClass(+row.buffer_pts)}" style="width:${pct}%"></div></div>
-              <span class="buf-num">${row.buffer_pts}</span>
+              <div class="buf-track"><div class="buf-fill ${bufClass(row.points, maxPts)}" style="width:${pct}%"></div></div>
+              <span class="buf-num">${row.points}</span>
             </div>
           </td>
-          <td class="col-accepted" style="font-family:'IBM Plex Mono',monospace;font-size:13px;">${row.total_accepted}</td>
+          <td class="col-accepted" style="font-family:'IBM Plex Mono',monospace;font-size:13px;">${accepted}</td>
           <td><span class="sbadge ${statusCls(row.status)}">${statusLabel(row.status)}</span></td>
         </tr>`;
     }).join('');
+  }
+
+  function esc(str) {
+    return String(str||'').replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   }
 
   function setFilter(val, btn) {
@@ -320,38 +340,39 @@
     render();
   }
 
-  async function loadStats() {
-    try {
-      const r = await fetch('/api/stats');
-      const s = await r.json();
-      const now = new Date();
-      document.getElementById('season-label').textContent =
-        `Сезон · ${now.toLocaleString('ru-RU',{month:'long',year:'numeric'})}`;
-      document.getElementById('stats').innerHTML = `
-        <div class="stat"><div class="stat-label">Рекрутов</div><div class="stat-val">${s.total_recruiters}</div><div class="stat-sub">в системе</div></div>
-        <div class="stat"><div class="stat-label">Принято</div><div class="stat-val">${s.total_accepted}</div><div class="stat-sub">кандидатов</div></div>
-        <div class="stat"><div class="stat-label">Отклонено</div><div class="stat-val">${s.total_rejected}</div><div class="stat-sub">выявлено нарушений</div></div>
-        <div class="stat"><div class="stat-label">На грани</div><div class="stat-val" style="color:var(--red)">${s.at_risk}</div><div class="stat-sub">буфер = 0</div></div>
-      `;
-    } catch(e) { console.error('stats error', e); }
-  }
-
-  async function loadLeaderboard() {
+  async function loadAll() {
     try {
       const r = await fetch('/api/leaderboard');
-      allData = await r.json();
+      const json = await r.json();
+      allData = json.recruiters || [];
+
+      // Обновляем заголовок
+      const now = new Date();
+      document.getElementById('season-label').textContent =
+        `Сезон · ${now.toLocaleString('ru-RU', {month:'long', year:'numeric'})}`;
+
+      // Считаем статистику из данных
+      const total    = allData.length;
+      const atRisk   = allData.filter(r => r.status === 'danger' || r.status === 'warning').length;
+      const accepted = allData.reduce((s, r) => s + (r.totalEarned || 0), 0);
+      const kicked   = allData.filter(r => r.status === 'kicked').length;
+
+      document.getElementById('stats').innerHTML = `
+        <div class="stat"><div class="stat-label">Рекрутов</div><div class="stat-val">${total}</div><div class="stat-sub">в системе</div></div>
+        <div class="stat"><div class="stat-label">Заработано баллов</div><div class="stat-val">${accepted}</div><div class="stat-sub">суммарно</div></div>
+        <div class="stat"><div class="stat-label">Удалено</div><div class="stat-val">${kicked}</div><div class="stat-sub">за всё время</div></div>
+        <div class="stat"><div class="stat-label">На грани</div><div class="stat-val" style="color:var(--red)">${atRisk}</div><div class="stat-sub">мало баллов</div></div>
+      `;
+
       render();
     } catch(e) {
-      document.getElementById('tbody').innerHTML = `<tr><td colspan="7" class="empty">Ошибка загрузки данных</td></tr>`;
+      document.getElementById('tbody').innerHTML =
+        `<tr><td colspan="7" class="empty">Ошибка загрузки данных</td></tr>`;
     }
   }
 
-  // Initial load
-  loadStats();
-  loadLeaderboard();
-
-  // Auto-refresh every 30 seconds
-  setInterval(() => { loadStats(); loadLeaderboard(); }, 30000);
+  loadAll();
+  setInterval(loadAll, 30000);
 </script>
 </body>
 </html>
