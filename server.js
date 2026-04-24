@@ -16,6 +16,24 @@ function requireToken(req, res, next) {
   next();
 }
 
+function requireAdmin(req, res, next) {
+  const token = req.headers['x-token'] || req.query.token;
+  const session = storage.validateToken(token);
+  if (!session) return res.status(401).json({ error: 'Не авторизован' });
+  if (session.role !== 'admin') return res.status(403).json({ error: 'Нет доступа' });
+  req.session = session;
+  next();
+}
+
+function requireRecruiter(req, res, next) {
+  const token = req.headers['x-token'] || req.query.token;
+  const session = storage.validateToken(token);
+  if (!session) return res.status(401).json({ error: 'Не авторизован' });
+  if (!['admin', 'recruiter'].includes(session.role)) return res.status(403).json({ error: 'Нет доступа' });
+  req.session = session;
+  next();
+}
+
 function requireApiKey(req, res, next) {
   const key = req.headers['x-api-key'] || req.query.key;
   if (key && key === process.env.API_KEY) return next();
@@ -51,16 +69,78 @@ app.post('/api/auth/change-password', requireToken, (req, res) => {
   res.json(result);
 });
 
-// Admin: approve user (via API key)
+// Legacy: approve via API key
 app.post('/api/auth/approve', requireApiKey, (req, res) => {
   const { login } = req.body;
   const ok = storage.approveUser(login);
   res.json({ ok });
 });
 
-// Admin: list pending users (via API key)
+// Legacy: pending via API key
 app.get('/api/auth/pending', requireApiKey, (req, res) => {
   res.json(storage.getPendingUsers());
+});
+
+// ── Admin: Approvals panel (via token) ────────────────────
+
+app.get('/api/admin/pending', requireAdmin, (req, res) => {
+  res.json(storage.getPendingUsers());
+});
+
+app.post('/api/admin/approve', requireAdmin, (req, res) => {
+  const { login, role } = req.body;
+  if (!login) return res.status(400).json({ error: 'Укажи логин' });
+  const ok = storage.approveUserWithRole(login, role || 'recruiter');
+  res.json({ ok });
+});
+
+app.post('/api/admin/reject', requireAdmin, (req, res) => {
+  const { login } = req.body;
+  if (!login) return res.status(400).json({ error: 'Укажи логин' });
+  const ok = storage.rejectUser(login);
+  res.json({ ok });
+});
+
+app.get('/api/admin/recruiters', requireAdmin, (req, res) => {
+  res.json(storage.getRecruiters());
+});
+
+// ── Admin: Tasks management ───────────────────────────────
+
+app.get('/api/admin/tasks', requireAdmin, (req, res) => {
+  res.json(storage.getAllTasks());
+});
+
+app.post('/api/admin/tasks', requireAdmin, (req, res) => {
+  const { title, description, assignedTo } = req.body;
+  if (!title) return res.status(400).json({ error: 'Укажи название задания' });
+  const task = storage.createTask(title, description, assignedTo || 'all');
+  res.json(task);
+});
+
+app.delete('/api/admin/tasks/:id', requireAdmin, (req, res) => {
+  const ok = storage.deleteTask(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'Задание не найдено' });
+  res.json({ ok });
+});
+
+// ── Recruiter: Tasks ──────────────────────────────────────
+
+app.get('/api/tasks', requireRecruiter, (req, res) => {
+  const tasks = storage.getTasksForUser(req.session.login);
+  res.json(tasks);
+});
+
+app.post('/api/tasks/:id/complete', requireRecruiter, (req, res) => {
+  const task = storage.completeTask(req.params.id, req.session.login);
+  if (!task) return res.status(404).json({ error: 'Задание не найдено' });
+  res.json(task);
+});
+
+app.post('/api/tasks/:id/uncomplete', requireRecruiter, (req, res) => {
+  const task = storage.uncompleteTask(req.params.id, req.session.login);
+  if (!task) return res.status(404).json({ error: 'Задание не найдено' });
+  res.json(task);
 });
 
 // ── Leaderboard ───────────────────────────────────────────
@@ -68,7 +148,6 @@ app.get('/api/auth/pending', requireApiKey, (req, res) => {
 app.get('/api/leaderboard', (req, res) => {
   const recruiters = storage.getAll();
   const config = storage.getConfig();
-
   const list = Object.values(recruiters)
     .filter(r => r.status !== 'kicked' || req.query.all === '1')
     .map(r => ({
@@ -78,7 +157,6 @@ app.get('/api/leaderboard', (req, res) => {
       history: undefined
     }))
     .sort((a, b) => b.points - a.points);
-
   res.json({ recruiters: list, config, lastBurn: storage.load().lastWeeklyBurn });
 });
 
@@ -89,20 +167,16 @@ app.get('/api/recruiter/:id', (req, res) => {
   res.json({ ...r, rank: storage.getRank(r.points, config) });
 });
 
-// ── Points editing (requires token) ──────────────────────
+// ── Points editing ────────────────────────────────────────
 
 app.post('/api/points', (req, res) => {
-  // Accept either token auth OR api key auth
   const token = req.headers['x-token'];
   const apiKey = req.headers['x-api-key'] || req.query.key;
   const session = token ? storage.validateToken(token) : null;
   const isApiKey = apiKey && apiKey === process.env.API_KEY;
-
   if (!session && !isApiKey) return res.status(401).json({ error: 'Не авторизован' });
-
   const { userId, amount, reason } = req.body;
   if (!userId || amount === undefined) return res.status(400).json({ error: 'Укажи userId и amount' });
-
   const actorId = session ? session.login : 'api';
   const r = storage.addPoints(userId, amount, reason || 'Ручное начисление', actorId);
   if (!r) return res.status(404).json({ error: 'Рекрут не найден' });
@@ -110,7 +184,7 @@ app.post('/api/points', (req, res) => {
   res.json({ ...r, rank: storage.getRank(r.points, config) });
 });
 
-// ── Admin endpoints ───────────────────────────────────────
+// ── Config / Admin via API key ────────────────────────────
 
 app.get('/api/config', (req, res) => res.json(storage.getConfig()));
 
