@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Личный Кабинет Рекрута</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #050508;
+    --surface:  #0d0d14;
+    --card:     #11111a;
+    --border:   #1e1e2e;
+    --red:      #e63946;
+    --gold:     #e9c46a;
+    --amber:    #f4a261;
+    --green:    #2ec27e;
+    --purple:   #a78bfa;
+    --blue:     #60a5fa;
+    --muted:    #555570;
+    --text:     #d8d8e8;
+    --dim:      #888899;
+    --white:    #f0f0fa;
+  }
+
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Rajdhani', sans-serif; min-height: 100vh; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(96,165,250,.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(96,165,250,.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 0 20px 60px; }
+
+  /* ── Header ── */
+  header {
+    padding: 40px 0 32px; display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 36px;
+    animation: fadeDown .6s ease both;
+  }
+  .logo { display: flex; align-items: flex-end; gap: 16px; }
+  .logo-icon {
+    width: 48px; height: 48px; background: var(--blue);
+    display: grid; place-items: center; font-size: 22px;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  }
+  h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(26px, 5vw, 42px); letter-spacing: 3px; line-height: 1; color: var(--white); }
+  h1 span { color: var(--blue); }
+
+  .nav-link {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted);
+    letter-spacing: 1px; text-transform: uppercase; text-decoration: none;
+    border: 1px solid var(--border); padding: 8px 16px; transition: .2s;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+  .nav-link:hover { border-color: var(--blue); color: var(--blue); }
+
+  /* ── Auth wall ── */
+  .auth-wall {
+    text-align: center; padding: 100px 20px;
+    display: none;
+  }
+  .auth-wall .icon { font-size: 56px; margin-bottom: 20px; }
+  .auth-wall h2 { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 3px; color: var(--white); margin-bottom: 10px; }
+  .auth-wall p { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+
+  /* ── Profile card ── */
+  .profile-card {
+    background: var(--card); border: 1px solid rgba(96,165,250,.2);
+    padding: 24px 28px; margin-bottom: 32px;
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+    animation: fadeUp .5s .1s ease both;
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+  .profile-avatar {
+    width: 64px; height: 64px; background: var(--surface); border: 2px solid var(--blue);
+    display: grid; place-items: center; font-size: 24px;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--blue); flex-shrink: 0;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  }
+  .profile-info { flex: 1; }
+  .profile-login { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--white); }
+  .profile-role {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px;
+    color: var(--blue); border: 1px solid rgba(96,165,250,.3); padding: 3px 10px; margin-top: 4px;
+    clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+  }
+  .profile-stats { display: flex; gap: 24px; flex-wrap: wrap; }
+  .p-stat { text-align: center; }
+  .p-stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; }
+  .p-stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .p-stat-value.blue { color: var(--blue); }
+  .p-stat-value.green { color: var(--green); }
+
+  /* ── Progress bar ── */
+  .progress-bar-wrap { margin-top: 12px; }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--blue); border-radius: 2px; transition: width .6s ease; }
+  .progress-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); margin-top: 4px; }
+
+  /* ── Section header ── */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; animation: fadeUp .5s .2s ease both;
+  }
+  .section-title {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::before { content: ''; display: block; width: 3px; height: 14px; background: var(--blue); }
+  .section-count {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim);
+  }
+
+  /* ── Task filters ── */
+  .task-filters { display: flex; gap: 8px; margin-bottom: 20px; animation: fadeUp .5s .25s ease both; }
+  .tfilter {
+    background: transparent; border: 1px solid var(--border); color: var(--dim);
+    font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 12px; letter-spacing: 1px;
+    padding: 6px 14px; cursor: pointer; transition: .2s;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+  .tfilter.active, .tfilter:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .tfilter.done.active, .tfilter.done:hover { background: var(--green); border-color: var(--green); }
+
+  /* ── Tasks list ── */
+  .tasks-container { animation: fadeUp .5s .3s ease both; }
+
+  .task-card {
+    background: var(--card); border: 1px solid var(--border);
+    padding: 18px 20px; margin-bottom: 10px; transition: border-color .2s, background .2s;
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    display: flex; align-items: flex-start; gap: 14px;
+    animation: fadeRow .4s ease both;
+  }
+  .task-card:hover { border-color: rgba(96,165,250,.25); }
+  .task-card.completed { border-color: rgba(46,194,126,.2); background: rgba(46,194,126,.03); }
+  .task-card.completed:hover { border-color: rgba(46,194,126,.35); }
+
+  .task-check {
+    width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 3px;
+    cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: all .2s; margin-top: 2px; font-size: 13px;
+  }
+  .task-check:hover { border-color: var(--blue); }
+  .task-card.completed .task-check { border-color: var(--green); background: rgba(46,194,126,.15); color: var(--green); }
+
+  .task-body { flex: 1; min-width: 0; }
+  .task-title {
+    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 17px;
+    color: var(--white); margin-bottom: 4px; line-height: 1.3;
+  }
+  .task-card.completed .task-title { color: var(--dim); text-decoration: line-through; }
+  .task-desc { font-size: 13px; color: var(--dim); margin-bottom: 8px; line-height: 1.4; }
+  .task-footer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .task-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 1px;
+    padding: 2px 8px; border: 1px solid;
+    clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+  }
+  .task-badge.all { color: var(--purple); border-color: rgba(167,139,250,.3); }
+  .task-badge.personal { color: var(--blue); border-color: rgba(96,165,250,.3); }
+  .task-badge.done-badge { color: var(--green); border-color: rgba(46,194,126,.3); }
+  .task-date { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); }
+
+  /* Complete animation */
+  @keyframes checkPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+  .task-check.pop { animation: checkPop .25s ease; }
+
+  /* ── Empty state ── */
+  .empty-tasks {
+    text-align: center; padding: 60px 20px; color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  }
+  .empty-tasks .icon { font-size: 40px; margin-bottom: 12px; }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed; bottom: 28px; right: 28px;
+    background: var(--card); border: 1px solid var(--border); padding: 12px 18px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .5px;
+    z-index: 999; opacity: 0; transform: translateY(10px); transition: all .25s;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .toast.show { opacity: 1; transform: none; }
+  .toast.green { border-color: rgba(46,194,126,.4); color: var(--green); }
+  .toast.blue  { border-color: rgba(96,165,250,.4); color: var(--blue); }
+
+  .btn-primary {
+    display: inline-block; background: var(--blue); color: #fff;
+    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1px;
+    padding: 10px 24px; border: none; cursor: pointer; transition: opacity .15s; text-decoration: none;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .btn-primary:hover { opacity: .85; }
+
+  @keyframes fadeDown { from { opacity:0; transform: translateY(-20px); } to { opacity:1; transform: none; } }
+  @keyframes fadeUp   { from { opacity:0; transform: translateY(16px);  } to { opacity:1; transform: none; } }
+  @keyframes fadeRow  { from { opacity:0; transform: translateX(-10px); } to { opacity:1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">📋</div>
+      <div>
+        <h1>ЛИЧНЫЙ <span>КАБИНЕТ</span></h1>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:4px;">RECRUITER PORTAL</div>
+      </div>
+    </div>
+    <a href="/" class="nav-link">← РЕЙТИНГ</a>
+  </header>
+
+  <!-- Auth wall -->
+  <div class="auth-wall" id="authWall">
+    <div class="icon">🔒</div>
+    <h2>ДОСТУП ЗАКРЫТ</h2>
+    <p>ВОЙДИ В СИСТЕМУ КАК РЕКРУТ ДЛЯ ДОСТУПА К КАБИНЕТУ</p>
+    <a href="/" class="btn-primary">← ВЕРНУТЬСЯ НА ГЛАВНУЮ</a>
+  </div>
+
+  <!-- Cabinet content -->
+  <div id="cabinetContent" style="display:none">
+
+    <!-- Profile card -->
+    <div class="profile-card" id="profileCard">
+      <div class="profile-avatar" id="profileAvatar">?</div>
+      <div class="profile-info">
+        <div class="profile-login" id="profileLogin">—</div>
+        <div class="profile-role">🎯 РЕКРУТ</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+          <div class="progress-label" id="progressLabel">0 / 0 заданий выполнено</div>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <div class="p-stat">
+          <div class="p-stat-value blue" id="statTotal">0</div>
+          <div class="p-stat-label">Всего</div>
+        </div>
+        <div class="p-stat">
+          <div class="p-stat-value green" id="statDone">0</div>
+          <div class="p-stat-label">Выполнено</div>
+        </div>
+        <div class="p-stat">
+          <div class="p-stat-value" id="statPending" style="color:var(--amber)">0</div>
+          <div class="p-stat-label">Осталось</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tasks section -->
+    <div class="section-header">
+      <div class="section-title">МОИ ЗАДАНИЯ</div>
+      <span class="section-count" id="sectionCount"></span>
+    </div>
+
+    <div class="task-filters">
+      <button class="tfilter active" onclick="setTaskFilter('all', this)">ВСЕ</button>
+      <button class="tfilter" onclick="setTaskFilter('pending', this)">АКТИВНЫЕ</button>
+      <button class="tfilter done" onclick="setTaskFilter('done', this)">ВЫПОЛНЕННЫЕ</button>
+    </div>
+
+    <div class="tasks-container" id="tasksContainer">
+      <div class="empty-tasks"><div class="icon">⏳</div>Загрузка заданий...</div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+let authToken = localStorage.getItem('authToken');
+let authUser  = JSON.parse(localStorage.getItem('authUser') || 'null');
+let allTasks  = [];
+let taskFilter = 'all';
+
+function esc(str) {
+  return String(str||'').replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+}
+
+function showToast(msg, type = 'green') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.className = 'toast', 2500);
+}
+
+async function init() {
+  if (!authToken) { showAuthWall(); return; }
+
+  // Verify token
+  try {
+    const r = await fetch('/api/auth/me', {headers:{'x-token':authToken}});
+    if (!r.ok) { showAuthWall(); return; }
+    const d = await r.json();
+    authUser = {login: d.login, role: d.role};
+    localStorage.setItem('authUser', JSON.stringify(authUser));
+    if (!['recruiter', 'admin'].includes(d.role)) { showAuthWall(); return; }
+  } catch { showAuthWall(); return; }
+
+  // Show cabinet
+  document.getElementById('authWall').style.display = 'none';
+  document.getElementById('cabinetContent').style.display = 'block';
+
+  // Set profile
+  const initials = authUser.login.slice(0, 2).toUpperCase();
+  document.getElementById('profileAvatar').textContent = initials;
+  document.getElementById('profileLogin').textContent = authUser.login.toUpperCase();
+
+  loadTasks();
+}
+
+function showAuthWall() {
+  document.getElementById('authWall').style.display = 'block';
+  document.getElementById('cabinetContent').style.display = 'none';
+}
+
+async function loadTasks() {
+  try {
+    const r = await fetch('/api/tasks', {headers:{'x-token':authToken}});
+    if (!r.ok) { showAuthWall(); return; }
+    allTasks = await r.json();
+    updateStats();
+    renderTasks();
+  } catch {
+    document.getElementById('tasksContainer').innerHTML =
+      '<div class="empty-tasks"><div class="icon">⚠</div>Ошибка загрузки</div>';
+  }
+}
+
+function updateStats() {
+  const total = allTasks.length;
+  const done = allTasks.filter(t => t.completedBy.includes(authUser.login)).length;
+  const pending = total - done;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statDone').textContent = done;
+  document.getElementById('statPending').textContent = pending;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = `${done} / ${total} заданий выполнено (${pct}%)`;
+}
+
+function setTaskFilter(f, btn) {
+  taskFilter = f;
+  document.querySelectorAll('.tfilter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTasks();
+}
+
+function getFilteredTasks() {
+  if (taskFilter === 'done') return allTasks.filter(t => t.completedBy.includes(authUser.login));
+  if (taskFilter === 'pending') return allTasks.filter(t => !t.completedBy.includes(authUser.login));
+  return allTasks;
+}
+
+function renderTasks() {
+  const tasks = getFilteredTasks();
+  const container = document.getElementById('tasksContainer');
+  document.getElementById('sectionCount').textContent = tasks.length + ' заданий';
+
+  if (!tasks.length) {
+    const msgs = {
+      all: { icon: '📭', text: 'Заданий пока нет. Ожидайте от администратора.' },
+      done: { icon: '✨', text: 'Нет выполненных заданий.' },
+      pending: { icon: '🎉', text: 'Все задания выполнены!' }
+    };
+    const m = msgs[taskFilter];
+    container.innerHTML = `<div class="empty-tasks"><div class="icon">${m.icon}</div>${m.text}</div>`;
+    return;
+  }
+
+  container.innerHTML = tasks.map((t, idx) => {
+    const isDone = t.completedBy.includes(authUser.login);
+    const isPersonal = t.assignedTo !== 'all';
+    const date = new Date(t.createdAt).toLocaleDateString('ru', {day:'numeric', month:'short'});
+    return `
+    <div class="task-card${isDone ? ' completed' : ''}" id="tc-${t.id}" style="animation-delay:${idx*50}ms">
+      <div class="task-check" id="chk-${t.id}" onclick="toggleTask('${t.id}', ${isDone})">
+        ${isDone ? '✓' : ''}
+      </div>
+      <div class="task-body">
+        <div class="task-title">${esc(t.title)}</div>
+        ${t.description ? `<div class="task-desc">${esc(t.description)}</div>` : ''}
+        <div class="task-footer">
+          <span class="task-badge ${isPersonal ? 'personal' : 'all'}">
+            ${isPersonal ? '👤 ЛИЧНОЕ' : '👥 ОБЩЕЕ'}
+          </span>
+          ${isDone ? '<span class="task-badge done-badge">✓ ВЫПОЛНЕНО</span>' : ''}
+          <span class="task-date">${date}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleTask(id, isDone) {
+  const endpoint = isDone ? 'uncomplete' : 'complete';
+  try {
+    const r = await fetch(`/api/tasks/${id}/${endpoint}`, {
+      method: 'POST', headers: {'x-token': authToken}
+    });
+    if (!r.ok) return;
+    const updated = await r.json();
+
+    // Update local data
+    const idx = allTasks.findIndex(t => t.id === id);
+    if (idx !== -1) allTasks[idx] = updated;
+
+    // Animate check
+    const chk = document.getElementById('chk-' + id);
+    if (chk) { chk.classList.add('pop'); setTimeout(() => chk.classList.remove('pop'), 300); }
+
+    updateStats();
+    renderTasks();
+    showToast(isDone ? '↩ Отмечено как невыполненное' : '✓ Задание выполнено!', isDone ? 'blue' : 'green');
+  } catch {
+    showToast('Ошибка соединения', 'blue');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
