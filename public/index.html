@@ -625,7 +625,7 @@ function bufferColor(pts) {
 function render() {
   const data = getFiltered();
   const tbody = document.getElementById('tbody');
-  const showEdit = !!authToken;
+  const showEdit = authUser?.role === 'admin';
   document.getElementById('editCol').style.display = showEdit ? '' : 'none';
 
   if (data.length === 0) {
