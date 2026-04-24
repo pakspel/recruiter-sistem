@@ -1,99 +1,138 @@
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+/**
+ * storage.js — SQLite backend
+ * DB path: DATA_PATH env var (defaults to ./data.db)
+ * On Railway: set DATA_PATH=/data/recruiter.db and mount a volume at /data
+ */
 
-const DATA_FILE = path.join(__dirname, 'data.json');
+const Database = require('better-sqlite3');
+const path     = require('path');
+const crypto   = require('crypto');
+
+const DB_PATH = process.env.DATA_PATH
+  ? path.resolve(process.env.DATA_PATH)
+  : path.join(__dirname, 'data.db');
 
 const CURATOR_MIN = 2000;
 
-const DEFAULT_DATA = {
-  recruiters: {},
-  users: {},
-  tokens: {},
-  tasks: {},
-  config: {
-    weeklyBurn: 5,
-    startingBuffer: 20,
-    scoring: {
-      accepted: 5,
-      rejected: 3,
-      candidateLeft: -3,
-      manualBonus: 0
-    },
-    ranks: [
-      { name: 'Стажёр',  emoji: '🔰', min: 0    },
-      { name: 'Рекрут',  emoji: '🎯', min: 30   },
-      { name: 'Агент',   emoji: '⚡', min: 75   },
-      { name: 'Элита',   emoji: '👑', min: 150  },
-      { name: 'Куратор', emoji: '🛡', min: 2000 }
-    ],
-    watchChannelId: null,
-    otherBotId: null,
-    adminRoleId: null,
-    leaderboardChannelId: null
-  },
-  lastWeeklyBurn: null
+const DEFAULT_CONFIG = {
+  weeklyBurn: 5,
+  startingBuffer: 20,
+  scoring: { accepted: 5, rejected: 3, candidateLeft: -3, manualBonus: 0 },
+  ranks: [
+    { name: 'Стажёр',  emoji: '🔰', min: 0    },
+    { name: 'Рекрут',  emoji: '🎯', min: 30   },
+    { name: 'Агент',   emoji: '⚡', min: 75   },
+    { name: 'Элита',   emoji: '👑', min: 150  },
+    { name: 'Куратор', emoji: '🛡', min: 2000 }
+  ],
+  watchChannelId: null, otherBotId: null,
+  adminRoleId: null, leaderboardChannelId: null
 };
 
-function load() {
-  if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(DEFAULT_DATA, null, 2));
-    return JSON.parse(JSON.stringify(DEFAULT_DATA));
+const db = new Database(DB_PATH);
+db.pragma('journal_mode = WAL');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS recruiters (
+    user_id         TEXT PRIMARY KEY,
+    username        TEXT NOT NULL,
+    display_name    TEXT,
+    points          INTEGER DEFAULT 0,
+    total_earned    INTEGER DEFAULT 0,
+    weekly_activity TEXT DEFAULT '[]',
+    joined_at       TEXT,
+    status          TEXT DEFAULT 'active',
+    history         TEXT DEFAULT '[]',
+    prev_earned     INTEGER DEFAULT 0
+  );
+  CREATE TABLE IF NOT EXISTS users (
+    login          TEXT PRIMARY KEY,
+    original_login TEXT NOT NULL,
+    password_hash  TEXT NOT NULL,
+    approved       INTEGER DEFAULT 0,
+    role           TEXT DEFAULT 'recruiter',
+    created_at     TEXT
+  );
+  CREATE TABLE IF NOT EXISTS tokens (
+    token      TEXT PRIMARY KEY,
+    login      TEXT NOT NULL,
+    role       TEXT NOT NULL,
+    created_at INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS tasks (
+    task_id      TEXT PRIMARY KEY,
+    title        TEXT NOT NULL,
+    description  TEXT DEFAULT '',
+    assigned_to  TEXT DEFAULT 'all',
+    created_at   TEXT,
+    completed_by TEXT DEFAULT '[]'
+  );
+  CREATE TABLE IF NOT EXISTS config (
+    key TEXT PRIMARY KEY, value TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY, value TEXT
+  );
+`);
+
+if (!db.prepare("SELECT 1 FROM config WHERE key='main'").get())
+  db.prepare("INSERT INTO config (key,value) VALUES ('main',?)").run(JSON.stringify(DEFAULT_CONFIG));
+
+// ── Helpers ───────────────────────────────────────────────
+
+function hashPassword(pw) { return crypto.createHash('sha256').update(pw).digest('hex'); }
+function isCurator(points) { return points >= CURATOR_MIN; }
+
+function rowToRecruiter(row) {
+  if (!row) return null;
+  return {
+    discordId:      row.user_id,
+    username:       row.username,
+    displayName:    row.display_name || row.username,
+    points:         row.points,
+    totalEarned:    row.total_earned,
+    weeklyActivity: JSON.parse(row.weekly_activity || '[]'),
+    joinedAt:       row.joined_at,
+    status:         row.status,
+    history:        JSON.parse(row.history || '[]'),
+    _prevEarned:    row.prev_earned
+  };
+}
+
+function rowToTask(row) {
+  return { id: row.task_id, title: row.title, description: row.description,
+           assignedTo: row.assigned_to, createdAt: row.created_at,
+           completedBy: JSON.parse(row.completed_by || '[]') };
+}
+
+// ── Recruiters ────────────────────────────────────────────
+
+function getAll() {
+  const result = {};
+  for (const row of db.prepare('SELECT * FROM recruiters').all()) {
+    const r = rowToRecruiter(row); result[r.discordId] = r;
   }
-  try {
-    const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    if (!d.users)  d.users  = {};
-    if (!d.tokens) d.tokens = {};
-    if (!d.tasks)  d.tasks  = {};
-    return d;
-  } catch {
-    return JSON.parse(JSON.stringify(DEFAULT_DATA));
-  }
+  return result;
 }
 
-function save(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+function get(userId) {
+  return rowToRecruiter(db.prepare('SELECT * FROM recruiters WHERE user_id=?').get(userId));
 }
-
-function hashPassword(pw) {
-  return crypto.createHash('sha256').update(pw).digest('hex');
-}
-
-function isCurator(points) {
-  return points >= CURATOR_MIN;
-}
-
-// ── Recruiter helpers ──────────────────────────────────────
-
-function getAll() { return load().recruiters; }
-function get(userId) { return load().recruiters[userId] || null; }
 
 function register(userId, username, displayName) {
-  const data = load();
-  if (!data.recruiters[userId]) {
-    data.recruiters[userId] = {
-      discordId: userId,
-      username,
-      displayName: displayName || username,
-      points: data.config.startingBuffer,
-      totalEarned: 0,
-      weeklyActivity: [],
-      joinedAt: new Date().toISOString(),
-      status: 'active',
-      history: []
-    };
-    save(data);
-  }
-  return data.recruiters[userId];
+  const config = getConfig();
+  if (!db.prepare('SELECT 1 FROM recruiters WHERE user_id=?').get(userId))
+    db.prepare(`INSERT INTO recruiters (user_id,username,display_name,points,total_earned,weekly_activity,joined_at,status,history,prev_earned) VALUES (?,?,?,?,0,'[]',?,'active','[]',0)`)
+      .run(userId, username, displayName || username, config.startingBuffer, new Date().toISOString());
+  return get(userId);
 }
 
 function addPoints(userId, amount, reason, actorId = null) {
-  const data = load();
-  if (!data.recruiters[userId]) return null;
-  const rec = data.recruiters[userId];
+  const row = db.prepare('SELECT * FROM recruiters WHERE user_id=?').get(userId);
+  if (!row) return null;
+  const rec = rowToRecruiter(row);
   rec.points = Math.max(0, rec.points + amount);
   if (amount > 0) rec.totalEarned = (rec.totalEarned || 0) + amount;
-  rec.history = rec.history || [];
   rec.history.unshift({ date: new Date().toISOString(), action: reason, delta: amount, actorId });
   rec.history = rec.history.slice(0, 50);
   if (!isCurator(rec.points)) {
@@ -101,235 +140,188 @@ function addPoints(userId, amount, reason, actorId = null) {
     else if (rec.points <= 5)  rec.status = 'danger';
     else if (rec.points <= 10) rec.status = 'warning';
     else                        rec.status = 'active';
-  } else {
-    rec.status = 'curator';
-  }
-  save(data);
+  } else { rec.status = 'curator'; }
+  db.prepare('UPDATE recruiters SET points=?,total_earned=?,history=?,status=? WHERE user_id=?')
+    .run(rec.points, rec.totalEarned, JSON.stringify(rec.history), rec.status, userId);
   return rec;
 }
 
-function remove(userId) {
-  const data = load();
-  delete data.recruiters[userId];
-  save(data);
+function remove(userId) { db.prepare('DELETE FROM recruiters WHERE user_id=?').run(userId); }
+
+// ── Config ────────────────────────────────────────────────
+
+function getConfig() {
+  const row = db.prepare("SELECT value FROM config WHERE key='main'").get();
+  return row ? JSON.parse(row.value) : DEFAULT_CONFIG;
 }
 
-function getConfig() { return load().config; }
-
 function setConfig(updates) {
-  const data = load();
-  data.config = { ...data.config, ...updates };
-  save(data);
-  return data.config;
+  const merged = { ...getConfig(), ...updates };
+  db.prepare("INSERT OR REPLACE INTO config (key,value) VALUES ('main',?)").run(JSON.stringify(merged));
+  return merged;
 }
 
 function getRank(points, config) {
-  const ranks = config.ranks;
-  let rank = ranks[0];
-  for (const r of ranks) { if (points >= r.min) rank = r; }
+  let rank = config.ranks[0];
+  for (const r of config.ranks) { if (points >= r.min) rank = r; }
   return rank;
 }
 
 function doWeeklyBurn() {
-  const data = load();
-  const burn = data.config.weeklyBurn || 5;
+  const burn = getConfig().weeklyBurn || 5;
   const results = { burned: [], kicked: [], skippedCurators: [] };
-  for (const [id, rec] of Object.entries(data.recruiters)) {
-    if (rec.status === 'kicked') continue;
-    if (isCurator(rec.points) || rec.status === 'curator') {
-      results.skippedCurators.push(id); continue;
+  const upd = db.prepare('UPDATE recruiters SET points=?,status=?,history=?,weekly_activity=?,prev_earned=? WHERE user_id=?');
+  db.transaction(() => {
+    for (const row of db.prepare('SELECT * FROM recruiters').all()) {
+      if (row.status === 'kicked') continue;
+      const rec = rowToRecruiter(row);
+      if (isCurator(rec.points) || rec.status === 'curator') { results.skippedCurators.push(row.user_id); continue; }
+      const wasActive = rec.totalEarned !== (rec._prevEarned || 0);
+      rec.weeklyActivity = [wasActive, ...rec.weeklyActivity].slice(0, 8);
+      const prevEarned = rec.totalEarned;
+      rec.points = Math.max(0, rec.points - burn);
+      rec.history.unshift({ date: new Date().toISOString(), action: `Еженедельное списание (-${burn})`, delta: -burn, actorId: 'system' });
+      rec.history = rec.history.slice(0, 50);
+      if (rec.points <= 0)       { rec.status = 'kicked';  results.kicked.push(row.user_id); }
+      else if (rec.points <= 5)  { rec.status = 'danger';  results.burned.push(row.user_id); }
+      else if (rec.points <= 10)   rec.status = 'warning';
+      else                          rec.status = 'active';
+      upd.run(rec.points, rec.status, JSON.stringify(rec.history), JSON.stringify(rec.weeklyActivity), prevEarned, row.user_id);
     }
-    const wasActive = rec.totalEarned !== (rec._prevEarned || 0);
-    rec.weeklyActivity = [wasActive, ...(rec.weeklyActivity || [])].slice(0, 8);
-    rec._prevEarned = rec.totalEarned;
-    rec.points = Math.max(0, rec.points - burn);
-    rec.history = rec.history || [];
-    rec.history.unshift({ date: new Date().toISOString(), action: `Еженедельное списание (-${burn})`, delta: -burn, actorId: 'system' });
-    rec.history = rec.history.slice(0, 50);
-    if (rec.points <= 0)       { rec.status = 'kicked';  results.kicked.push(id); }
-    else if (rec.points <= 5)  { rec.status = 'danger';  results.burned.push(id); }
-    else if (rec.points <= 10) { rec.status = 'warning'; }
-    else                        { rec.status = 'active';  }
-  }
-  data.lastWeeklyBurn = new Date().toISOString();
-  save(data);
+  })();
+  db.prepare("INSERT OR REPLACE INTO meta (key,value) VALUES ('lastWeeklyBurn',?)").run(new Date().toISOString());
   return results;
 }
 
-// ── Auth helpers ──────────────────────────────────────────
+// ── Auth ──────────────────────────────────────────────────
 
 function seedAdmin(login, password) {
-  const data = load();
-  if (!data.users[login.toLowerCase()]) {
-    data.users[login.toLowerCase()] = {
-      login,
-      passwordHash: hashPassword(password),
-      approved: true,
-      role: 'admin',
-      createdAt: new Date().toISOString()
-    };
-    save(data);
+  const key = login.toLowerCase();
+  if (!db.prepare('SELECT 1 FROM users WHERE login=?').get(key)) {
+    db.prepare(`INSERT INTO users (login,original_login,password_hash,approved,role,created_at) VALUES (?,?,?,1,'admin',?)`)
+      .run(key, login, hashPassword(password), new Date().toISOString());
     console.log(`✅ Admin user "${login}" created`);
   }
 }
 
 function registerUser(login, password) {
-  const data = load();
   const key = login.toLowerCase();
-  if (data.users[key]) return { ok: false, error: 'Пользователь уже существует' };
-  data.users[key] = {
-    login,
-    passwordHash: hashPassword(password),
-    approved: false,
-    role: 'recruiter',
-    createdAt: new Date().toISOString()
-  };
-  save(data);
+  if (db.prepare('SELECT 1 FROM users WHERE login=?').get(key))
+    return { ok: false, error: 'Пользователь уже существует' };
+  db.prepare(`INSERT INTO users (login,original_login,password_hash,approved,role,created_at) VALUES (?,?,?,0,'recruiter',?)`)
+    .run(key, login, hashPassword(password), new Date().toISOString());
   return { ok: true };
 }
 
 function loginUser(login, password) {
-  const data = load();
-  const user = data.users[login.toLowerCase()];
+  const key = login.toLowerCase();
+  const user = db.prepare('SELECT * FROM users WHERE login=?').get(key);
   if (!user) return { ok: false, error: 'Неверный логин или пароль' };
-  if (user.passwordHash !== hashPassword(password)) return { ok: false, error: 'Неверный логин или пароль' };
+  if (user.password_hash !== hashPassword(password)) return { ok: false, error: 'Неверный логин или пароль' };
   if (!user.approved) return { ok: false, error: 'pending', pending: true };
   const token = crypto.randomBytes(32).toString('hex');
-  data.tokens[token] = { login: user.login, role: user.role, createdAt: Date.now() };
-  save(data);
-  return { ok: true, token, login: user.login, role: user.role };
+  db.prepare('INSERT OR REPLACE INTO tokens (token,login,role,created_at) VALUES (?,?,?,?)')
+    .run(token, user.original_login, user.role, Date.now());
+  return { ok: true, token, login: user.original_login, role: user.role };
 }
 
 function validateToken(token) {
   if (!token) return null;
-  const data = load();
-  const t = data.tokens[token];
-  if (!t) return null;
-  if (Date.now() - t.createdAt > 30 * 24 * 60 * 60 * 1000) {
-    delete data.tokens[token];
-    save(data);
-    return null;
+  const row = db.prepare('SELECT * FROM tokens WHERE token=?').get(token);
+  if (!row) return null;
+  if (Date.now() - row.created_at > 30 * 24 * 60 * 60 * 1000) {
+    db.prepare('DELETE FROM tokens WHERE token=?').run(token); return null;
   }
-  return t;
+  return { login: row.login, role: row.role };
 }
 
 function approveUser(login) {
-  const data = load();
-  const user = data.users[login.toLowerCase()];
-  if (!user) return false;
-  user.approved = true;
-  save(data);
-  return true;
+  return db.prepare("UPDATE users SET approved=1 WHERE login=?").run(login.toLowerCase()).changes > 0;
 }
-
 function approveUserWithRole(login, role) {
-  const data = load();
-  const user = data.users[login.toLowerCase()];
-  if (!user) return false;
-  user.approved = true;
-  user.role = role || 'recruiter';
-  save(data);
-  return true;
+  return db.prepare("UPDATE users SET approved=1,role=? WHERE login=?").run(role || 'recruiter', login.toLowerCase()).changes > 0;
 }
-
 function rejectUser(login) {
-  const data = load();
-  const key = login.toLowerCase();
-  if (!data.users[key]) return false;
-  delete data.users[key];
-  save(data);
-  return true;
+  return db.prepare('DELETE FROM users WHERE login=?').run(login.toLowerCase()).changes > 0;
 }
-
 function getPendingUsers() {
-  const data = load();
-  return Object.values(data.users)
-    .filter(u => !u.approved)
-    .map(u => ({ login: u.login, createdAt: u.createdAt }));
+  return db.prepare("SELECT original_login as login, created_at FROM users WHERE approved=0").all()
+    .map(r => ({ login: r.login, createdAt: r.created_at }));
 }
-
 function getRecruiters() {
-  const data = load();
-  return Object.values(data.users)
-    .filter(u => u.approved && u.role === 'recruiter')
-    .map(u => ({ login: u.login, createdAt: u.createdAt }));
+  return db.prepare("SELECT original_login as login, created_at FROM users WHERE approved=1 AND role='recruiter'").all()
+    .map(r => ({ login: r.login, createdAt: r.created_at }));
+}
+function changePassword(login, oldPassword, newPassword) {
+  const user = db.prepare('SELECT * FROM users WHERE login=?').get(login.toLowerCase());
+  if (!user) return { ok: false, error: 'Пользователь не найден' };
+  if (user.password_hash !== hashPassword(oldPassword)) return { ok: false, error: 'Неверный старый пароль' };
+  db.prepare('UPDATE users SET password_hash=? WHERE login=?').run(hashPassword(newPassword), login.toLowerCase());
+  return { ok: true };
 }
 
-function changePassword(login, oldPassword, newPassword) {
-  const data = load();
-  const user = data.users[login.toLowerCase()];
-  if (!user) return { ok: false, error: 'Пользователь не найден' };
-  if (user.passwordHash !== hashPassword(oldPassword)) return { ok: false, error: 'Неверный старый пароль' };
-  user.passwordHash = hashPassword(newPassword);
-  save(data);
-  return { ok: true };
+// ── Superadmin ────────────────────────────────────────────
+
+function getAllUsersForAdmin() {
+  return db.prepare("SELECT original_login as login, role, created_at FROM users WHERE approved=1 ORDER BY created_at").all()
+    .map(r => ({ login: r.login, role: r.role, createdAt: r.created_at }));
+}
+
+function setUserRole(login, role) {
+  const key = login.toLowerCase();
+  const userRow = db.prepare('SELECT original_login FROM users WHERE login=?').get(key);
+  if (!userRow) return false;
+  db.prepare('UPDATE users SET role=? WHERE login=?').run(role, key);
+  db.prepare('UPDATE tokens SET role=? WHERE login=?').run(role, userRow.original_login);
+  return true;
 }
 
 // ── Tasks ─────────────────────────────────────────────────
 
 function createTask(title, description, assignedTo) {
-  const data = load();
-  if (!data.tasks) data.tasks = {};
   const id = crypto.randomBytes(8).toString('hex');
-  data.tasks[id] = {
-    id,
-    title,
-    description: description || '',
-    assignedTo: assignedTo || 'all',
-    createdAt: new Date().toISOString(),
-    completedBy: []
-  };
-  save(data);
-  return data.tasks[id];
+  const now = new Date().toISOString();
+  db.prepare(`INSERT INTO tasks (task_id,title,description,assigned_to,created_at,completed_by) VALUES (?,?,?,?,?,'[]')`)
+    .run(id, title, description || '', assignedTo || 'all', now);
+  return { id, title, description: description || '', assignedTo: assignedTo || 'all', createdAt: now, completedBy: [] };
 }
-
 function getAllTasks() {
-  const data = load();
-  if (!data.tasks) return [];
-  return Object.values(data.tasks).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all().map(rowToTask);
 }
-
 function getTasksForUser(login) {
-  const data = load();
-  if (!data.tasks) return [];
-  return Object.values(data.tasks)
-    .filter(t => t.assignedTo === 'all' || t.assignedTo === login)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return db.prepare("SELECT * FROM tasks WHERE assigned_to='all' OR assigned_to=? ORDER BY created_at DESC").all(login).map(rowToTask);
 }
-
 function completeTask(taskId, login) {
-  const data = load();
-  if (!data.tasks || !data.tasks[taskId]) return null;
-  const task = data.tasks[taskId];
-  if (!task.completedBy.includes(login)) {
-    task.completedBy.push(login);
-    save(data);
-  }
-  return task;
+  const row = db.prepare('SELECT * FROM tasks WHERE task_id=?').get(taskId);
+  if (!row) return null;
+  const completedBy = JSON.parse(row.completed_by || '[]');
+  if (!completedBy.includes(login)) { completedBy.push(login); db.prepare('UPDATE tasks SET completed_by=? WHERE task_id=?').run(JSON.stringify(completedBy), taskId); }
+  return rowToTask({ ...row, completed_by: JSON.stringify(completedBy) });
 }
-
 function uncompleteTask(taskId, login) {
-  const data = load();
-  if (!data.tasks || !data.tasks[taskId]) return null;
-  const task = data.tasks[taskId];
-  task.completedBy = task.completedBy.filter(l => l !== login);
-  save(data);
-  return task;
+  const row = db.prepare('SELECT * FROM tasks WHERE task_id=?').get(taskId);
+  if (!row) return null;
+  const completedBy = JSON.parse(row.completed_by || '[]').filter(l => l !== login);
+  db.prepare('UPDATE tasks SET completed_by=? WHERE task_id=?').run(JSON.stringify(completedBy), taskId);
+  return rowToTask({ ...row, completed_by: JSON.stringify(completedBy) });
+}
+function deleteTask(taskId) {
+  return db.prepare('DELETE FROM tasks WHERE task_id=?').run(taskId).changes > 0;
 }
 
-function deleteTask(taskId) {
-  const data = load();
-  if (!data.tasks || !data.tasks[taskId]) return false;
-  delete data.tasks[taskId];
-  save(data);
-  return true;
+// ── Compat shim ───────────────────────────────────────────
+
+function load() {
+  const lwb = db.prepare("SELECT value FROM meta WHERE key='lastWeeklyBurn'").get();
+  return { recruiters: getAll(), config: getConfig(), lastWeeklyBurn: lwb ? lwb.value : null };
 }
 
 module.exports = {
-  load, save, getAll, get, register, addPoints, remove,
+  load, getAll, get, register, addPoints, remove,
   getConfig, setConfig, getRank, doWeeklyBurn, isCurator,
   seedAdmin, registerUser, loginUser, validateToken,
   approveUser, approveUserWithRole, rejectUser,
   getPendingUsers, getRecruiters, changePassword, hashPassword,
-  createTask, getAllTasks, getTasksForUser, completeTask, uncompleteTask, deleteTask
+  createTask, getAllTasks, getTasksForUser, completeTask, uncompleteTask, deleteTask,
+  getAllUsersForAdmin, setUserRole
 };
