@@ -19,6 +19,7 @@
     --gold:     #e9c46a;
     --amber:    #f4a261;
     --green:    #2ec27e;
+    --purple:   #a78bfa;
     --muted:    #555570;
     --text:     #d8d8e8;
     --dim:      #888899;
@@ -35,17 +36,14 @@
     overflow-x: hidden;
   }
 
-  /* ── Background grid ── */
   body::before {
     content: '';
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background-image:
       linear-gradient(rgba(230,57,70,.03) 1px, transparent 1px),
       linear-gradient(90deg, rgba(230,57,70,.03) 1px, transparent 1px);
     background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
+    pointer-events: none; z-index: 0;
   }
 
   .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; }
@@ -53,11 +51,8 @@
   /* ── Header ── */
   header {
     padding: 50px 0 40px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 20px;
-    flex-wrap: wrap;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap;
     border-bottom: 1px solid var(--border);
     margin-bottom: 40px;
     animation: fadeDown .6s ease both;
@@ -71,27 +66,26 @@
     display: grid; place-items: center;
     font-size: 28px;
     clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    cursor: pointer;
+    transition: .2s;
+    position: relative;
+  }
+  .logo-icon:hover { background: #c0252e; }
+  .logo-icon.logged-in { background: #1a3a2a; border: 1px solid var(--green); }
+  .logo-icon.logged-in::after {
+    content: ''; position: absolute; bottom: 8px; right: 8px;
+    width: 8px; height: 8px; background: var(--green);
+    border-radius: 50%; box-shadow: 0 0 6px var(--green);
   }
 
-  h1 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(32px, 6vw, 52px);
-    letter-spacing: 3px;
-    line-height: 1;
-    color: var(--white);
-  }
-
+  h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(32px, 6vw, 52px); letter-spacing: 3px; line-height: 1; color: var(--white); }
   h1 span { color: var(--red); }
 
   .meta {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    color: var(--dim);
-    letter-spacing: 1px;
-    text-transform: uppercase;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim);
+    letter-spacing: 1px; text-transform: uppercase;
     display: flex; flex-direction: column; gap: 4px; text-align: right;
   }
-
   .meta strong { color: var(--muted); }
 
   /* ── Filters ── */
@@ -102,248 +96,208 @@
   }
 
   .filter-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--dim);
-    font-family: 'Rajdhani', sans-serif;
-    font-weight: 600;
-    font-size: 13px;
-    letter-spacing: 1px;
-    padding: 7px 18px;
-    cursor: pointer;
-    transition: .2s;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--dim); font-family: 'Rajdhani', sans-serif;
+    font-weight: 600; font-size: 13px; letter-spacing: 1px;
+    padding: 7px 18px; cursor: pointer; transition: .2s;
     clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
   }
-
-  .filter-btn:hover, .filter-btn.active {
-    background: var(--red);
-    border-color: var(--red);
-    color: #fff;
-  }
+  .filter-btn:hover, .filter-btn.active { background: var(--red); border-color: var(--red); color: #fff; }
+  .filter-btn.curator-filter:hover, .filter-btn.curator-filter.active { background: var(--purple); border-color: var(--purple); }
 
   .spacer { flex: 1; }
+  .update-info { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); align-self: center; }
 
-  .update-info {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-    align-self: center;
+  /* ── Stats ── */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin-bottom: 32px;
+    animation: fadeUp .5s .1s ease both;
   }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border); padding: 16px 20px;
+    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  }
+  .stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+  .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 2px; color: var(--white); }
+  .stat-value.red    { color: var(--red); }
+  .stat-value.gold   { color: var(--gold); }
+  .stat-value.purple { color: var(--purple); }
 
   /* ── Table ── */
-  .table-wrap {
-    animation: fadeUp .5s .3s ease both;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  thead tr {
-    border-bottom: 1px solid var(--red);
-  }
-
+  .table-wrap { animation: fadeUp .5s .3s ease both; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { border-bottom: 1px solid var(--red); }
   th {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    color: var(--muted);
-    padding: 12px 16px;
-    text-align: left;
-    cursor: pointer;
-    white-space: nowrap;
-    user-select: none;
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted); padding: 12px 16px;
+    text-align: left; cursor: pointer; white-space: nowrap; user-select: none;
   }
-
   th:hover { color: var(--red); }
   th.sorted { color: var(--red); }
   th.sorted::after { content: ' ↓'; }
   th.sorted.asc::after { content: ' ↑'; }
 
-  tbody tr {
-    border-bottom: 1px solid var(--border);
-    transition: background .15s;
-    animation: fadeRow .4s ease both;
-  }
-
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; animation: fadeRow .4s ease both; }
   tbody tr:hover { background: rgba(230,57,70,.04); }
+  tbody tr.curator-row { background: rgba(167,139,250,.03); }
+  tbody tr.curator-row:hover { background: rgba(167,139,250,.07); }
 
-  td {
-    padding: 16px 16px;
-    vertical-align: middle;
-    font-size: 15px;
-    font-weight: 500;
-  }
+  td { padding: 16px 16px; vertical-align: middle; font-size: 15px; font-weight: 500; }
 
-  /* ── Position cell ── */
-  .pos {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 13px;
-    color: var(--muted);
-    width: 44px;
-  }
-
+  .pos { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; }
   .pos-1, .pos-2, .pos-3 { font-size: 18px; }
-  .pos-1 { color: var(--gold); }
-  .pos-2 { color: #aaa; }
-  .pos-3 { color: var(--amber); }
+  .pos-1 { color: var(--gold); } .pos-2 { color: #aaa; } .pos-3 { color: var(--amber); }
+  .pos-cur { color: var(--purple); font-size: 18px; }
 
-  /* ── Name cell ── */
-  .recruiter-name {
-    display: flex; align-items: center; gap: 12px;
-  }
-
+  .recruiter-name { display: flex; align-items: center; gap: 12px; }
   .avatar {
-    width: 38px; height: 38px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    display: grid; place-items: center;
-    font-size: 15px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-weight: 500;
-    color: var(--dim);
-    flex-shrink: 0;
+    width: 38px; height: 38px; background: var(--surface); border: 1px solid var(--border);
+    display: grid; place-items: center; font-size: 15px;
+    font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--dim); flex-shrink: 0;
     clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   }
-
+  .avatar.curator-av { border-color: var(--purple); color: var(--purple); }
   .name-block { display: flex; flex-direction: column; gap: 2px; }
   .display-name { color: var(--white); font-weight: 700; font-size: 15px; }
   .discord-tag { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); }
 
-  /* ── Points ── */
-  .pts {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 18px;
-    font-weight: 500;
-    color: var(--white);
-  }
+  .pts { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 500; color: var(--white); }
+  .pts.curator-pts { color: var(--purple); }
 
-  /* ── Rank badge ── */
   .rank-badge {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 4px 12px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: .5px;
+    padding: 4px 12px; font-size: 12px; font-weight: 700; letter-spacing: .5px;
     border: 1px solid;
     clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
   }
+  .rank-Стажёр  { color: var(--muted);   border-color: var(--muted);  }
+  .rank-Рекрут  { color: var(--text);    border-color: var(--border); }
+  .rank-Агент   { color: var(--amber);   border-color: var(--amber);  }
+  .rank-Элита   { color: var(--gold);    border-color: var(--gold);   background: rgba(233,196,106,.06); }
+  .rank-Куратор { color: var(--purple);  border-color: var(--purple); background: rgba(167,139,250,.06); }
 
-  .rank-Стажёр  { color: var(--muted);  border-color: var(--muted);  }
-  .rank-Рекрут  { color: var(--text);   border-color: var(--border); }
-  .rank-Агент   { color: var(--amber);  border-color: var(--amber);  }
-  .rank-Элита   { color: var(--gold);   border-color: var(--gold);   background: rgba(233,196,106,.06); }
-
-  /* ── Buffer bar ── */
   .buffer-wrap { min-width: 100px; }
+  .buffer-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+  .buffer-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
+  .buffer-text { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
 
-  .buffer-bar {
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-    margin-top: 4px;
-  }
-
-  .buffer-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width .5s ease;
-  }
-
-  .buffer-text {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-  }
-
-  /* ── Weeks dots ── */
   .weeks { display: flex; gap: 4px; }
-
-  .week-dot {
-    width: 8px; height: 8px;
-    border-radius: 1px;
-  }
-
+  .week-dot { width: 8px; height: 8px; border-radius: 1px; }
   .week-dot.on  { background: var(--green); }
   .week-dot.off { background: var(--border); }
 
-  /* ── Status dot ── */
-  .status-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 6px;
-    flex-shrink: 0;
-  }
-
-  .s-active  { background: var(--green); box-shadow: 0 0 6px var(--green); }
-  .s-warning { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
-  .s-danger  { background: var(--red);   box-shadow: 0 0 6px var(--red);   }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; flex-shrink: 0; }
+  .s-active  { background: var(--green);  box-shadow: 0 0 6px var(--green); }
+  .s-warning { background: var(--amber);  box-shadow: 0 0 6px var(--amber); }
+  .s-danger  { background: var(--red);    box-shadow: 0 0 6px var(--red); }
   .s-kicked  { background: var(--muted); }
+  .s-curator { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
 
-  /* ── Top row highlight ── */
-  tbody tr:first-child td {
-    background: rgba(233,196,106,.025);
+  /* Edit button */
+  .edit-btn {
+    background: none; border: 1px solid transparent; color: var(--muted);
+    font-size: 12px; width: 28px; height: 28px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: .2s; opacity: 0;
+    clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
   }
+  tbody tr:hover .edit-btn { opacity: 1; }
+  .edit-btn:hover { background: rgba(230,57,70,.15); border-color: var(--red); color: var(--red); }
 
-  /* ── Empty state ── */
-  .empty {
-    text-align: center;
-    padding: 80px 20px;
-    color: var(--muted);
-  }
+  tbody tr:first-child td { background: rgba(233,196,106,.025); }
 
+  .empty { text-align: center; padding: 80px 20px; color: var(--muted); }
   .empty .big { font-size: 48px; margin-bottom: 12px; }
   .empty p { font-size: 14px; letter-spacing: .5px; }
 
-  /* ── Stats row ── */
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px;
-    margin-bottom: 32px;
-    animation: fadeUp .5s .1s ease both;
-  }
-
-  .stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    padding: 16px 20px;
-    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
-  }
-
-  .stat-label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
-
-  .stat-value {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 30px;
-    letter-spacing: 2px;
-    color: var(--white);
-  }
-
-  .stat-value.red  { color: var(--red);  }
-  .stat-value.gold { color: var(--gold); }
-
-  /* ── Animations ── */
   @keyframes fadeDown { from { opacity:0; transform: translateY(-20px); } to { opacity:1; transform: none; } }
   @keyframes fadeUp   { from { opacity:0; transform: translateY(16px);  } to { opacity:1; transform: none; } }
   @keyframes fadeRow  { from { opacity:0; transform: translateX(-10px); } to { opacity:1; transform: none; } }
 
-  /* Mobile */
-  @media (max-width: 680px) {
-    td.hide-sm, th.hide-sm { display: none; }
-    td { padding: 12px 10px; }
+  @media (max-width: 680px) { td.hide-sm, th.hide-sm { display: none; } td { padding: 12px 10px; } }
+
+  /* ── Modal ── */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.8);
+    z-index: 200; display: none; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px);
   }
+  .overlay.open { display: flex; }
+
+  .modal {
+    background: var(--card); border: 1px solid var(--border);
+    padding: 32px; width: 100%; max-width: 420px; margin: 1rem;
+    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+    animation: fadeUp .3s ease both;
+  }
+
+  .modal-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px;
+    color: var(--white); margin-bottom: 6px;
+  }
+  .modal-sub { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-bottom: 24px; }
+
+  .modal-tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .modal-tab {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--dim); font-family: 'Rajdhani', sans-serif; font-weight: 600;
+    font-size: 14px; letter-spacing: 1px; padding: 8px 16px; cursor: pointer;
+    margin-bottom: -1px; transition: .15s;
+  }
+  .modal-tab.active { color: var(--red); border-bottom-color: var(--red); }
+
+  .modal-form { display: none; }
+  .modal-form.active { display: block; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-label { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  .form-input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    color: var(--white); font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 500;
+    padding: 10px 14px; outline: none; transition: border-color .15s;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .form-input:focus { border-color: var(--red); }
+
+  .modal-msg {
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .5px;
+    padding: 10px 14px; margin-bottom: 16px; display: none;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+  .modal-msg.error   { background: rgba(230,57,70,.1);   color: #ff8088; border: 1px solid rgba(230,57,70,.3); display: block; }
+  .modal-msg.success { background: rgba(46,194,126,.1);  color: #5dffa7; border: 1px solid rgba(46,194,126,.3); display: block; }
+  .modal-msg.info    { background: rgba(233,196,106,.1); color: var(--gold); border: 1px solid rgba(233,196,106,.3); display: block; }
+
+  .btn-primary {
+    width: 100%; background: var(--red); color: #fff;
+    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1px;
+    padding: 11px; border: none; cursor: pointer; transition: opacity .15s;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    margin-top: 4px;
+  }
+  .btn-primary:hover { opacity: .85; }
+  .btn-ghost {
+    width: 100%; background: transparent; color: var(--dim);
+    font-family: 'Rajdhani', sans-serif; font-size: 13px;
+    padding: 9px; border: 1px solid var(--border); cursor: pointer; transition: .15s; margin-top: 8px;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+  .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+
+  /* Sign toggle */
+  .sign-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .sign-btn {
+    flex: 1; padding: 9px; border: 1px solid var(--border); background: transparent;
+    color: var(--dim); font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 14px;
+    letter-spacing: 1px; cursor: pointer; transition: .15s;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+  .sign-btn.plus.active  { border-color: var(--green); background: rgba(46,194,126,.1); color: var(--green); }
+  .sign-btn.minus.active { border-color: var(--red);   background: rgba(230,57,70,.1);  color: var(--red); }
+
+  .edit-target { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--white); letter-spacing: 1px; margin-bottom: 20px; }
+  .edit-target span { color: var(--gold); }
 </style>
 </head>
 <body>
@@ -351,7 +305,7 @@
 
   <header>
     <div class="logo">
-      <div class="logo-icon">☠</div>
+      <div class="logo-icon" id="authIcon" onclick="handleAuthClick()" title="Авторизация">☠</div>
       <div>
         <h1>РЕЙТИНГ <span>РЕКРУТОВ</span></h1>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:4px;">INTERNAL · CLASSIFIED</div>
@@ -361,26 +315,16 @@
       <span>ОБНОВЛЕНО: <strong id="updateTime">—</strong></span>
       <span>СЕЗОН: <strong id="season">—</strong></span>
       <span>СЛЕДУЮЩЕЕ СПИСАНИЕ: <strong id="nextBurn">ПН 12:00</strong></span>
+      <span id="authMeta" style="color:var(--green);display:none"></span>
     </div>
   </header>
 
   <div class="stats-row" id="statsRow">
-    <div class="stat-card">
-      <div class="stat-label">Всего рекрутов</div>
-      <div class="stat-value" id="statTotal">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Активных</div>
-      <div class="stat-value" id="statActive">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">В опасности</div>
-      <div class="stat-value red" id="statDanger">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Топ — баллы</div>
-      <div class="stat-value gold" id="statTop">—</div>
-    </div>
+    <div class="stat-card"><div class="stat-label">Всего рекрутов</div><div class="stat-value" id="statTotal">—</div></div>
+    <div class="stat-card"><div class="stat-label">Активных</div><div class="stat-value" id="statActive">—</div></div>
+    <div class="stat-card"><div class="stat-label">В опасности</div><div class="stat-value red" id="statDanger">—</div></div>
+    <div class="stat-card"><div class="stat-label">Кураторов</div><div class="stat-value purple" id="statCurators">—</div></div>
+    <div class="stat-card"><div class="stat-label">Топ — баллы</div><div class="stat-value gold" id="statTop">—</div></div>
   </div>
 
   <div class="toolbar">
@@ -388,6 +332,7 @@
     <button class="filter-btn" onclick="setFilter('active', this)">АКТИВНЫЕ</button>
     <button class="filter-btn" onclick="setFilter('warning', this)">ПРЕДУПРЕЖДЕНИЕ</button>
     <button class="filter-btn" onclick="setFilter('danger', this)">ОПАСНОСТЬ</button>
+    <button class="filter-btn curator-filter" onclick="setFilter('curator', this)">КУРАТОРЫ</button>
     <div class="spacer"></div>
     <span class="update-info" id="refreshInfo">Обновление каждые 30с</span>
   </div>
@@ -403,12 +348,79 @@
           <th class="hide-sm">БУФЕР</th>
           <th class="hide-sm">НЕДЕЛИ</th>
           <th>СТАТУС</th>
+          <th id="editCol" style="display:none;width:40px"></th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="7"><div class="empty"><div class="big">⏳</div><p>ЗАГРУЗКА ДАННЫХ...</p></div></td></tr>
+        <tr><td colspan="8"><div class="empty"><div class="big">⏳</div><p>ЗАГРУЗКА ДАННЫХ...</p></div></td></tr>
       </tbody>
     </table>
+  </div>
+
+</div>
+
+<!-- AUTH MODAL -->
+<div class="overlay" id="authOverlay">
+  <div class="modal">
+    <div class="modal-title">ДОСТУП</div>
+    <div class="modal-sub">INTERNAL · CLASSIFIED · AUTHORIZED ONLY</div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchTab('login')">ВОЙТИ</button>
+      <button class="modal-tab" onclick="switchTab('register')">РЕГИСТРАЦИЯ</button>
+    </div>
+    <div class="modal-msg" id="authMsg"></div>
+
+    <div class="modal-form active" id="loginForm">
+      <div class="form-group"><label class="form-label">Логин</label><input class="form-input" id="loginUser" placeholder="Введи логин"></div>
+      <div class="form-group"><label class="form-label">Пароль</label><input class="form-input" type="password" id="loginPass" placeholder="Введи пароль"></div>
+      <button class="btn-primary" onclick="doLogin()">ВОЙТИ</button>
+      <button class="btn-ghost" onclick="closeOverlay('authOverlay')">ОТМЕНА</button>
+    </div>
+
+    <div class="modal-form" id="registerForm">
+      <div class="form-group"><label class="form-label">Логин</label><input class="form-input" id="regUser" placeholder="Придумай логин"></div>
+      <div class="form-group"><label class="form-label">Пароль</label><input class="form-input" type="password" id="regPass" placeholder="Минимум 6 символов"></div>
+      <button class="btn-primary" onclick="doRegister()">ОТПРАВИТЬ ЗАЯВКУ</button>
+      <button class="btn-ghost" onclick="closeOverlay('authOverlay')">ОТМЕНА</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOGGED IN MENU -->
+<div class="overlay" id="menuOverlay">
+  <div class="modal" style="max-width:320px">
+    <div class="modal-title" id="menuTitle">☠ ДОСТУП</div>
+    <div class="modal-sub" id="menuSub">АВТОРИЗОВАН</div>
+    <div class="modal-msg" id="menuMsg"></div>
+    <div class="form-group" style="margin-top:8px">
+      <label class="form-label">Старый пароль</label>
+      <input class="form-input" type="password" id="oldPass" placeholder="Текущий пароль">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Новый пароль</label>
+      <input class="form-input" type="password" id="newPass" placeholder="Минимум 6 символов">
+    </div>
+    <button class="btn-primary" onclick="doChangePass()">СМЕНИТЬ ПАРОЛЬ</button>
+    <button class="btn-ghost" style="color:var(--red);border-color:rgba(230,57,70,.3)" onclick="doLogout()">ВЫЙТИ</button>
+    <button class="btn-ghost" onclick="closeOverlay('menuOverlay')">ЗАКРЫТЬ</button>
+  </div>
+</div>
+
+<!-- EDIT POINTS MODAL -->
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <div class="modal-title">ИЗМЕНИТЬ БАЛЛЫ</div>
+    <div class="modal-sub">РУЧНОЕ НАЧИСЛЕНИЕ · ТРЕБУЕТ АВТОРИЗАЦИИ</div>
+    <div class="modal-msg" id="editMsg"></div>
+    <div class="edit-target">РЕКРУТ: <span id="editTargetName">—</span></div>
+    <div class="sign-row">
+      <button class="sign-btn plus active" id="signPlus" onclick="setSign(1)">+ НАЧИСЛИТЬ</button>
+      <button class="sign-btn minus" id="signMinus" onclick="setSign(-1)">− СНЯТЬ</button>
+    </div>
+    <div class="form-group"><label class="form-label">Количество баллов</label><input class="form-input" type="number" id="editAmount" placeholder="10" min="1"></div>
+    <div class="form-group"><label class="form-label">Причина</label><input class="form-input" id="editReason" placeholder="Провёл обзвон, нарушение..."></div>
+    <button class="btn-primary" onclick="doEditPoints()">ПРИМЕНИТЬ</button>
+    <button class="btn-ghost" onclick="closeOverlay('editOverlay')">ОТМЕНА</button>
   </div>
 </div>
 
@@ -418,9 +430,15 @@ let filter = 'all';
 let sortKey = '_pos';
 let sortAsc = false;
 let config = {};
+let authToken = localStorage.getItem('authToken');
+let authUser  = JSON.parse(localStorage.getItem('authUser') || 'null');
+let editSign = 1;
+let editTargetId = null;
 
-const RANK_ORDER = { 'Стажёр': 0, 'Рекрут': 1, 'Агент': 2, 'Элита': 3 };
+const RANK_ORDER = { 'Стажёр': 0, 'Рекрут': 1, 'Агент': 2, 'Элита': 3, 'Куратор': 4 };
 const MEDALS = ['🥇','🥈','🥉'];
+
+// ── Data loading ──────────────────────────────────────────
 
 async function fetchData() {
   try {
@@ -438,14 +456,24 @@ async function fetchData() {
 }
 
 function updateStats() {
-  const active = allData.filter(r => r.status === 'active').length;
-  const danger = allData.filter(r => r.status === 'danger' || r.status === 'warning').length;
-  const top = allData[0]?.points ?? 0;
-  document.getElementById('statTotal').textContent = allData.length;
-  document.getElementById('statActive').textContent = active;
-  document.getElementById('statDanger').textContent = danger;
-  document.getElementById('statTop').textContent = top;
+  const nonCurators = allData.filter(r => !isCurator(r));
+  const curators = allData.filter(r => isCurator(r));
+  const active  = nonCurators.filter(r => r.status === 'active').length;
+  const danger  = nonCurators.filter(r => r.status === 'danger' || r.status === 'warning').length;
+  const top     = nonCurators.length ? Math.max(...nonCurators.map(r => r.points)) : 0;
+
+  document.getElementById('statTotal').textContent    = nonCurators.length;
+  document.getElementById('statActive').textContent   = active;
+  document.getElementById('statDanger').textContent   = danger;
+  document.getElementById('statCurators').textContent = curators.length;
+  document.getElementById('statTop').textContent      = top;
 }
+
+function isCurator(r) {
+  return r.isCurator || r.status === 'curator' || r.points >= 2000;
+}
+
+// ── Render ────────────────────────────────────────────────
 
 function setFilter(f, btn) {
   filter = f;
@@ -457,9 +485,7 @@ function setFilter(f, btn) {
 function sortBy(key) {
   if (sortKey === key) sortAsc = !sortAsc;
   else { sortKey = key; sortAsc = false; }
-  document.querySelectorAll('th[id^="th-"]').forEach(th => {
-    th.classList.remove('sorted','asc');
-  });
+  document.querySelectorAll('th[id^="th-"]').forEach(th => th.classList.remove('sorted','asc'));
   const el = document.getElementById('th-' + key);
   if (el) { el.classList.add('sorted'); if (sortAsc) el.classList.add('asc'); }
   render();
@@ -467,7 +493,10 @@ function sortBy(key) {
 
 function getFiltered() {
   let d = allData.slice();
-  if (filter !== 'all') d = d.filter(r => r.status === filter);
+  if (filter === 'curator') d = d.filter(r => isCurator(r));
+  else if (filter !== 'all') d = d.filter(r => !isCurator(r) && r.status === filter);
+  else d = d.filter(r => true);
+
   d.sort((a, b) => {
     let va = a[sortKey], vb = b[sortKey];
     if (sortKey === 'rank') { va = RANK_ORDER[a.rank?.name] ?? 0; vb = RANK_ORDER[b.rank?.name] ?? 0; }
@@ -487,28 +516,39 @@ function bufferColor(pts) {
 function render() {
   const data = getFiltered();
   const tbody = document.getElementById('tbody');
+  const showEdit = !!authToken;
+  document.getElementById('editCol').style.display = showEdit ? '' : 'none';
 
   if (data.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty"><div class="big">📋</div><p>НЕТ ДАННЫХ ДЛЯ ОТОБРАЖЕНИЯ</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty"><div class="big">📋</div><p>НЕТ ДАННЫХ</p></div></td></tr>`;
     return;
   }
 
-  // Max points for buffer bar
-  const maxPts = Math.max(...allData.map(r => r.points), 1);
+  // For ranking, only count non-curators
+  const nonCurSorted = allData.filter(r => !isCurator(r)).sort((a,b) => b.points - a.points);
+  const maxPts = Math.max(...nonCurSorted.map(r => r.points), 1);
+  let ncIdx = 0;
 
   tbody.innerHTML = data.map((r, idx) => {
-    const pos = idx + 1;
-    const posLabel = MEDALS[pos - 1] ?? `${pos}`;
-    const posClass = pos <= 3 ? `pos-${pos}` : '';
+    const cur = isCurator(r);
+    const rank = r.rank || { name: 'Стажёр', emoji: '🔰' };
+
+    let posLabel, posClass, rowClass = '';
+    if (cur) {
+      posLabel = '🛡'; posClass = 'pos-cur'; rowClass = 'curator-row';
+    } else {
+      const gi = nonCurSorted.findIndex(x => x.discordId === r.discordId) + 1;
+      posLabel = MEDALS[gi-1] ?? gi;
+      posClass = gi <= 3 ? `pos-${gi}` : '';
+    }
 
     const initials = (r.displayName || r.username || '?').slice(0, 2).toUpperCase();
-    const rank = r.rank || { name: 'Стажёр', emoji: '🔰' };
-    const pct = Math.min(100, (r.points / maxPts) * 100);
-    const bColor = bufferColor(r.points);
+    const pct = cur ? 100 : Math.min(100, (r.points / maxPts) * 100);
+    const bColor = cur ? '#a78bfa' : bufferColor(r.points);
 
     const weeks = Array.from({ length: 4 }, (_, i) => {
       const on = (r.weeklyActivity || [])[i];
-      return `<div class="week-dot ${on ? 'on' : 'off'}" title="${on ? 'Активен' : 'Неактивен'}"></div>`;
+      return `<div class="week-dot ${on ? 'on' : 'off'}"></div>`;
     }).join('');
 
     const statusMap = {
@@ -516,40 +556,197 @@ function render() {
       warning: ['s-warning', 'ПРЕДУПР'],
       danger:  ['s-danger',  'ОПАСНОСТЬ'],
       kicked:  ['s-kicked',  'УДАЛЁН'],
+      curator: ['s-curator', 'КУРАТОР'],
     };
-    const [sCls, sLabel] = statusMap[r.status] || ['s-kicked', '—'];
+    const [sCls, sLabel] = cur ? ['s-curator','КУРАТОР'] : (statusMap[r.status] || ['s-kicked','—']);
+
+    const editBtn = showEdit
+      ? `<button class="edit-btn" onclick="openEdit('${r.discordId}','${esc(r.displayName||r.username)}')">✏</button>`
+      : '';
 
     return `
-    <tr style="animation-delay:${idx * 40}ms">
+    <tr class="${rowClass}" style="animation-delay:${idx*40}ms">
       <td class="pos ${posClass}">${posLabel}</td>
       <td>
         <div class="recruiter-name">
-          <div class="avatar">${initials}</div>
+          <div class="avatar${cur?' curator-av':''}">${initials}</div>
           <div class="name-block">
-            <span class="display-name">${esc(r.displayName || r.username)}</span>
+            <span class="display-name">${esc(r.displayName||r.username)}</span>
             <span class="discord-tag">${esc(r.username)}</span>
           </div>
         </div>
       </td>
-      <td class="pts">${r.points}</td>
+      <td class="pts${cur?' curator-pts':''}">${r.points}</td>
       <td class="hide-sm"><span class="rank-badge rank-${rank.name}">${rank.emoji} ${rank.name}</span></td>
       <td class="hide-sm">
         <div class="buffer-wrap">
-          <div class="buffer-text">${r.points} / ${maxPts}</div>
+          <div class="buffer-text">${cur ? '∞' : r.points + ' / ' + maxPts}</div>
           <div class="buffer-bar"><div class="buffer-fill" style="width:${pct}%;background:${bColor}"></div></div>
         </div>
       </td>
-      <td class="hide-sm"><div class="weeks">${weeks}</div></td>
+      <td class="hide-sm"><div class="weeks">${cur ? '🛡🛡🛡🛡' : weeks}</div></td>
       <td><span class="status-dot ${sCls}"></span>${sLabel}</td>
+      <td>${editBtn}</td>
     </tr>`;
   }).join('');
 }
 
 function esc(str) {
-  return String(str || '').replace(/[<>&"]/g, c => ({ '<':'&lt;', '>':'&gt;', '&':'&amp;', '"':'&quot;' }[c]));
+  return String(str||'').replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 }
 
-// Initial load + polling
+// ── Auth ──────────────────────────────────────────────────
+
+function handleAuthClick() {
+  if (authToken) {
+    document.getElementById('menuTitle').textContent = '☠ ' + (authUser?.login || 'ДОСТУП');
+    document.getElementById('menuMsg').className = 'modal-msg';
+    document.getElementById('oldPass').value = '';
+    document.getElementById('newPass').value = '';
+    openOverlay('menuOverlay');
+  } else {
+    document.getElementById('authMsg').className = 'modal-msg';
+    openOverlay('authOverlay');
+  }
+}
+
+function updateAuthUI() {
+  const icon = document.getElementById('authIcon');
+  const meta = document.getElementById('authMeta');
+  if (authUser) {
+    icon.classList.add('logged-in');
+    icon.title = authUser.login + ' · нажми для управления';
+    meta.textContent = '● ' + authUser.login;
+    meta.style.display = '';
+    document.getElementById('editCol').style.display = '';
+  } else {
+    icon.classList.remove('logged-in');
+    icon.title = 'Авторизация';
+    meta.style.display = 'none';
+  }
+  render();
+}
+
+function openOverlay(id) { document.getElementById(id).classList.add('open'); }
+function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+
+function switchTab(tab) {
+  document.querySelectorAll('.modal-tab').forEach((t,i)=>t.classList.toggle('active',(tab==='login'&&i===0)||(tab==='register'&&i===1)));
+  document.getElementById('loginForm').classList.toggle('active', tab==='login');
+  document.getElementById('registerForm').classList.toggle('active', tab==='register');
+  document.getElementById('authMsg').className = 'modal-msg';
+}
+
+function showMsg(id, text, type) {
+  const el = document.getElementById(id);
+  el.textContent = text; el.className = 'modal-msg ' + type;
+}
+
+async function doLogin() {
+  const login = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  if (!login || !password) return showMsg('authMsg','ЗАПОЛНИ ВСЕ ПОЛЯ','error');
+  const r = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password})});
+  const d = await r.json();
+  if (d.pending) return showMsg('authMsg','ОЖИДАЙ ОДОБРЕНИЯ РАЗРАБОТЧИКА','info');
+  if (!d.ok) return showMsg('authMsg', (d.error||'ОШИБКА').toUpperCase(),'error');
+  authToken = d.token; authUser = {login: d.login, role: d.role};
+  localStorage.setItem('authToken', authToken);
+  localStorage.setItem('authUser', JSON.stringify(authUser));
+  closeOverlay('authOverlay');
+  updateAuthUI();
+}
+
+async function doRegister() {
+  const login = document.getElementById('regUser').value.trim();
+  const password = document.getElementById('regPass').value;
+  if (!login || !password) return showMsg('authMsg','ЗАПОЛНИ ВСЕ ПОЛЯ','error');
+  const r = await fetch('/api/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({login,password})});
+  const d = await r.json();
+  if (!d.ok) return showMsg('authMsg',(d.error||'ОШИБКА').toUpperCase(),'error');
+  showMsg('authMsg','ЗАЯВКА ОТПРАВЛЕНА · ОЖИДАЙ ОДОБРЕНИЯ','success');
+  setTimeout(()=>switchTab('login'),2500);
+}
+
+async function doChangePass() {
+  const op = document.getElementById('oldPass').value;
+  const np = document.getElementById('newPass').value;
+  if (!op || !np) return showMsg('menuMsg','ЗАПОЛНИ ВСЕ ПОЛЯ','error');
+  if (np.length < 6) return showMsg('menuMsg','ПАРОЛЬ МИНИМУМ 6 СИМВОЛОВ','error');
+  const r = await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json','x-token':authToken},body:JSON.stringify({oldPassword:op,newPassword:np})});
+  const d = await r.json();
+  if (!d.ok) return showMsg('menuMsg',(d.error||'ОШИБКА').toUpperCase(),'error');
+  showMsg('menuMsg','ПАРОЛЬ ИЗМЕНЁН','success');
+}
+
+function doLogout() {
+  authToken = null; authUser = null;
+  localStorage.removeItem('authToken'); localStorage.removeItem('authUser');
+  closeOverlay('menuOverlay');
+  updateAuthUI();
+}
+
+// ── Edit points ───────────────────────────────────────────
+
+function openEdit(id, name) {
+  editTargetId = id; editSign = 1;
+  document.getElementById('editTargetName').textContent = name;
+  document.getElementById('editAmount').value = '';
+  document.getElementById('editReason').value = '';
+  document.getElementById('editMsg').className = 'modal-msg';
+  document.getElementById('signPlus').classList.add('active');
+  document.getElementById('signMinus').classList.remove('active');
+  openOverlay('editOverlay');
+}
+
+function setSign(s) {
+  editSign = s;
+  document.getElementById('signPlus').classList.toggle('active', s===1);
+  document.getElementById('signMinus').classList.toggle('active', s===-1);
+}
+
+async function doEditPoints() {
+  const amount = parseInt(document.getElementById('editAmount').value);
+  const reason = document.getElementById('editReason').value.trim() || 'Ручное начисление';
+  if (!amount || amount <= 0) return showMsg('editMsg','ВВЕДИ КОЛИЧЕСТВО БАЛЛОВ','error');
+  const r = await fetch('/api/points',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-token':authToken},
+    body:JSON.stringify({userId:editTargetId, amount:amount*editSign, reason})
+  });
+  const d = await r.json();
+  if (d.error) return showMsg('editMsg',(d.error).toUpperCase(),'error');
+  closeOverlay('editOverlay');
+  fetchData();
+}
+
+// Close on overlay click
+document.querySelectorAll('.overlay').forEach(o=>{
+  o.addEventListener('click', e=>{ if(e.target===o) closeOverlay(o.id); });
+});
+
+// Enter key
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Enter') return;
+  if(document.getElementById('authOverlay').classList.contains('open')) {
+    document.getElementById('loginForm').classList.contains('active') ? doLogin() : doRegister();
+  }
+  if(document.getElementById('editOverlay').classList.contains('open')) doEditPoints();
+});
+
+// Verify token
+if (authToken) {
+  fetch('/api/auth/me',{headers:{'x-token':authToken}})
+    .then(r=>r.ok?r.json():null)
+    .then(d=>{
+      if(d){ authUser={login:d.login,role:d.role}; }
+      else { authToken=null; authUser=null; localStorage.removeItem('authToken'); localStorage.removeItem('authUser'); }
+      updateAuthUI();
+    }).catch(()=>updateAuthUI());
+} else {
+  updateAuthUI();
+}
+
 fetchData();
 setInterval(fetchData, 30000);
 </script>
