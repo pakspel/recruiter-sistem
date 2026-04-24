@@ -8,7 +8,7 @@ startServer();
 startBot();
 
 // Seed admin account on startup
-storage.seedAdmin('PAKSEL', '1203Anime');
+storage.seedAdmin('PAKSPEL', '1203Anime');
 
 // Every Monday at 12:00 — weekly burn
 cron.schedule('0 12 * * 1', () => {
