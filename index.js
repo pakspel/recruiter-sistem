@@ -7,9 +7,17 @@ const storage = require('./storage');
 startServer();
 startBot();
 
-// Seed admin account on startup
+// Seed superadmin account on startup
+const SUPER_ADMIN_LOGIN    = process.env.SUPER_ADMIN_LOGIN;
+const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
+
+if (!SUPER_ADMIN_LOGIN || !SUPER_ADMIN_PASSWORD) {
+  console.error('FATAL: SUPER_ADMIN_LOGIN и SUPER_ADMIN_PASSWORD должны быть заданы в .env');
+  process.exit(1);
+}
+
 try {
-  storage.seedAdmin('PAKSPEL', '1203Anime');
+  storage.seedAdmin(SUPER_ADMIN_LOGIN, SUPER_ADMIN_PASSWORD);
 } catch (e) {
   console.error('seedAdmin error:', e.message);
 }

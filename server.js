@@ -50,16 +50,16 @@ function requireRecruiter(req, res, next) {
 }
 
 function requireApiKey(req, res, next) {
-  const key = req.headers['x-api-key'] || req.query.key;
+  const key = req.headers['x-api-key'];
   if (key && key === process.env.API_KEY) return next();
   res.status(401).json({ error: 'Unauthorized' });
 }
 
-/** Only PAKSPEL can use superadmin routes */
+/** Only the superadmin (SUPER_ADMIN_LOGIN) can use superadmin routes */
 function requireSuperAdmin(req, res, next) {
   const session = storage.validateToken(req.headers['x-token'] || req.query.token);
   if (!session) return res.status(401).json({ error: 'Не авторизован' });
-  if (session.login !== 'PAKSPEL') return res.status(403).json({ error: 'Только суперадмин' });
+  if (session.login !== process.env.SUPER_ADMIN_LOGIN) return res.status(403).json({ error: 'Только суперадмин' });
   req.session = session; next();
 }
 
@@ -183,7 +183,7 @@ app.get('/api/recruiter/:id', (req, res) => {
 
 app.post('/api/points', (req, res) => {
   const token  = req.headers['x-token'];
-  const apiKey = req.headers['x-api-key'] || req.query.key;
+  const apiKey = req.headers['x-api-key'];
   const session  = token  ? storage.validateToken(token)               : null;
   const isApiKey = apiKey && apiKey === process.env.API_KEY;
 
@@ -214,7 +214,7 @@ app.post('/api/superadmin/users/:login/role', requireSuperAdmin, (req, res) => {
   const { role } = req.body;
   if (!['recruiter', 'admin'].includes(role))
     return res.status(400).json({ error: 'Роль должна быть recruiter или admin' });
-  if (req.params.login === 'PAKSPEL')
+  if (req.params.login === process.env.SUPER_ADMIN_LOGIN)
     return res.status(400).json({ error: 'Нельзя изменить роль суперадмина' });
   const ok = storage.setUserRole(req.params.login, role);
   if (!ok) return res.status(404).json({ error: 'Пользователь не найден' });
