@@ -18,3 +18,7 @@ cron.schedule('0 12 * * 1', () => {
 });
 
 console.log('🚀 Recruiter System started');
+process.on('SIGTERM', () => {
+  console.log('SIGTERM получен, завершаем...');
+  process.exit(0);
+});
