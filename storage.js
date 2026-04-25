@@ -39,6 +39,8 @@ db.exec(`
     display_name    TEXT,
     points          INTEGER DEFAULT 0,
     total_earned    INTEGER DEFAULT 0,
+    total_accepted  INTEGER DEFAULT 0,
+    total_rejected  INTEGER DEFAULT 0,
     weekly_activity TEXT DEFAULT '[]',
     joined_at       TEXT,
     status          TEXT DEFAULT 'active',
@@ -91,6 +93,8 @@ function rowToRecruiter(row) {
     displayName:    row.display_name || row.username,
     points:         row.points,
     totalEarned:    row.total_earned,
+    totalAccepted:  row.total_accepted || 0,
+    totalRejected:  row.total_rejected || 0,
     weeklyActivity: JSON.parse(row.weekly_activity || '[]'),
     joinedAt:       row.joined_at,
     status:         row.status,
@@ -127,7 +131,7 @@ function register(userId, username, displayName) {
   return get(userId);
 }
 
-function addPoints(userId, amount, reason, actorId = null) {
+function addPoints(userId, amount, reason, actorId = null, type = null) {
   const row = db.prepare('SELECT * FROM recruiters WHERE user_id=?').get(userId);
   if (!row) return null;
   const rec = rowToRecruiter(row);
@@ -141,8 +145,18 @@ function addPoints(userId, amount, reason, actorId = null) {
     else if (rec.points <= 10) rec.status = 'warning';
     else                        rec.status = 'active';
   } else { rec.status = 'curator'; }
-  db.prepare('UPDATE recruiters SET points=?,total_earned=?,history=?,status=? WHERE user_id=?')
-    .run(rec.points, rec.totalEarned, JSON.stringify(rec.history), rec.status, userId);
+
+  // Track accepted/rejected counters
+  const acceptedInc = type === 'accepted' ? 1 : 0;
+  const rejectedInc = type === 'rejected' ? 1 : 0;
+
+  db.prepare(`UPDATE recruiters
+    SET points=?, total_earned=?, history=?, status=?,
+        total_accepted = COALESCE(total_accepted, 0) + ?,
+        total_rejected = COALESCE(total_rejected, 0) + ?
+    WHERE user_id=?`)
+    .run(rec.points, rec.totalEarned, JSON.stringify(rec.history), rec.status,
+         acceptedInc, rejectedInc, userId);
   return rec;
 }
 
@@ -311,10 +325,10 @@ function deleteTask(taskId) {
 
 // ── Discord linking ───────────────────────────────────────
 
-// Добавляем колонку discord_id если её ещё нет (миграция)
-try {
-  db.exec("ALTER TABLE users ADD COLUMN discord_id TEXT DEFAULT NULL");
-} catch (_) { /* уже существует */ }
+// Миграции (для существующих БД)
+try { db.exec("ALTER TABLE users ADD COLUMN discord_id TEXT DEFAULT NULL"); } catch (_) {}
+try { db.exec("ALTER TABLE recruiters ADD COLUMN total_accepted INTEGER DEFAULT 0"); } catch (_) {}
+try { db.exec("ALTER TABLE recruiters ADD COLUMN total_rejected INTEGER DEFAULT 0"); } catch (_) {}
 
 /** Привязать Discord ID к аккаунту пользователя */
 function linkDiscordToUser(login, discordId) {

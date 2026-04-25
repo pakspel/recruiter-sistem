@@ -182,7 +182,7 @@ async function parseOtherBotMessage(message) {
     const recruiterId = m[1];
     const candidateId = m[2];
     if (!storage.get(recruiterId)) continue;
-    storage.addPoints(recruiterId, scoring.accepted, `Принял кандидата <@${candidateId}>`, 'bot-auto');
+    storage.addPoints(recruiterId, scoring.accepted, `Принял кандидата <@${candidateId}>`, 'bot-auto', 'accepted');
     results.push({ recruiterId, delta: +scoring.accepted, action: 'принял заявку' });
   }
 
