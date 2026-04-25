@@ -1,10 +1,31 @@
-const express = require('express');
-const path    = require('path');
-const storage = require('./storage');
+const express    = require('express');
+const path       = require('path');
+const rateLimit  = require('express-rate-limit');
+const storage    = require('./storage');
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Rate limiters ─────────────────────────────────────────
+
+/** Логин: 10 попыток за 15 минут с одного IP */
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Слишком много попыток входа. Попробуй через 15 минут.' }
+});
+
+/** Регистрация: 5 аккаунтов за час с одного IP */
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Слишком много регистраций с этого IP. Попробуй через час.' }
+});
 
 // ── Middleware ────────────────────────────────────────────
 
@@ -44,7 +65,7 @@ function requireSuperAdmin(req, res, next) {
 
 // ── Auth ──────────────────────────────────────────────────
 
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', registerLimiter, (req, res) => {
   const { login, password } = req.body;
   if (!login || !password) return res.status(400).json({ error: 'Укажи логин и пароль' });
   if (login.length < 3)    return res.status(400).json({ error: 'Логин минимум 3 символа' });
@@ -52,7 +73,7 @@ app.post('/api/auth/register', (req, res) => {
   res.json(storage.registerUser(login, password));
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', loginLimiter, (req, res) => {
   const { login, password } = req.body;
   if (!login || !password) return res.status(400).json({ error: 'Укажи логин и пароль' });
   const result = storage.loginUser(login, password);
@@ -62,6 +83,11 @@ app.post('/api/auth/login', (req, res) => {
 
 app.get('/api/auth/me', requireToken, (req, res) => {
   res.json({ login: req.session.login, role: req.session.role });
+});
+
+app.post('/api/auth/logout', requireToken, (req, res) => {
+  const token = req.headers['x-token'] || req.query.token;
+  res.json(storage.logoutUser(token));
 });
 
 app.post('/api/auth/change-password', requireToken, (req, res) => {

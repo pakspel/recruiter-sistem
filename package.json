@@ -12,6 +12,8 @@
     "express": "^4.18.2",
     "node-cron": "^3.0.3",
     "dotenv": "^16.4.5",
-    "better-sqlite3": "^9.4.3"
+    "better-sqlite3": "^9.4.3",
+    "bcryptjs": "^2.4.3",
+    "express-rate-limit": "^7.4.0"
   }
 }

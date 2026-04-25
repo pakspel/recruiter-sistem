@@ -7,6 +7,7 @@
 const Database = require('better-sqlite3');
 const path     = require('path');
 const crypto   = require('crypto');
+const bcrypt   = require('bcryptjs');
 
 const DB_PATH = process.env.DATA_PATH
   ? path.resolve(process.env.DATA_PATH)
@@ -82,7 +83,29 @@ if (!db.prepare("SELECT 1 FROM config WHERE key='main'").get())
 
 // ── Helpers ───────────────────────────────────────────────
 
-function hashPassword(pw) { return crypto.createHash('sha256').update(pw).digest('hex'); }
+// ── Password hashing (bcrypt) ─────────────────────────────
+// Новые пароли всегда хешируются через bcrypt (cost 12).
+// Миграция: если в БД ещё лежит старый sha256-хеш — при первом
+// успешном входе автоматически перехеширует в bcrypt.
+
+const BCRYPT_ROUNDS = 12;
+
+function hashPassword(pw) {
+  return bcrypt.hashSync(pw, BCRYPT_ROUNDS);
+}
+
+/** Сравнивает пароль с хешем; возвращает true при совпадении.
+ *  Поддерживает оба формата: bcrypt ($2b$…) и legacy sha256. */
+function verifyPassword(pw, stored) {
+  if (stored.startsWith('$2')) {
+    return bcrypt.compareSync(pw, stored);
+  }
+  // Старый sha256-хеш — проверяем по-старому
+  return crypto.createHash('sha256').update(pw).digest('hex') === stored;
+}
+
+// Оставляем для обратной совместимости (используется в seedAdmin)
+function hashPasswordLegacy(pw) { return crypto.createHash('sha256').update(pw).digest('hex'); }
 function isCurator(points) { return points >= CURATOR_MIN; }
 
 function rowToRecruiter(row) {
@@ -231,8 +254,14 @@ function loginUser(login, password) {
   const key = login.toLowerCase();
   const user = db.prepare('SELECT * FROM users WHERE login=?').get(key);
   if (!user) return { ok: false, error: 'Неверный логин или пароль' };
-  if (user.password_hash !== hashPassword(password)) return { ok: false, error: 'Неверный логин или пароль' };
+  if (!verifyPassword(password, user.password_hash)) return { ok: false, error: 'Неверный логин или пароль' };
   if (!user.approved) return { ok: false, error: 'pending', pending: true };
+
+  // Плавная миграция: перехешируем sha256 → bcrypt при первом входе
+  if (!user.password_hash.startsWith('$2')) {
+    db.prepare('UPDATE users SET password_hash=? WHERE login=?').run(hashPassword(password), key);
+  }
+
   const token = crypto.randomBytes(32).toString('hex');
   db.prepare('INSERT OR REPLACE INTO tokens (token,login,role,created_at) VALUES (?,?,?,?)')
     .run(token, user.original_login, user.role, Date.now());
@@ -247,6 +276,11 @@ function validateToken(token) {
     db.prepare('DELETE FROM tokens WHERE token=?').run(token); return null;
   }
   return { login: row.login, role: row.role };
+}
+
+function logoutUser(token) {
+  db.prepare('DELETE FROM tokens WHERE token=?').run(token);
+  return { ok: true };
 }
 
 function approveUser(login) {
@@ -269,8 +303,10 @@ function getRecruiters() {
 function changePassword(login, oldPassword, newPassword) {
   const user = db.prepare('SELECT * FROM users WHERE login=?').get(login.toLowerCase());
   if (!user) return { ok: false, error: 'Пользователь не найден' };
-  if (user.password_hash !== hashPassword(oldPassword)) return { ok: false, error: 'Неверный старый пароль' };
+  if (!verifyPassword(oldPassword, user.password_hash)) return { ok: false, error: 'Неверный старый пароль' };
   db.prepare('UPDATE users SET password_hash=? WHERE login=?').run(hashPassword(newPassword), login.toLowerCase());
+  // Инвалидируем все активные токены пользователя — безопасность
+  db.prepare('DELETE FROM tokens WHERE login=?').run(user.original_login);
   return { ok: true };
 }
 
@@ -402,7 +438,7 @@ function load() {
 module.exports = {
   load, getAll, get, register, addPoints, remove,
   getConfig, setConfig, getRank, doWeeklyBurn, isCurator,
-  seedAdmin, registerUser, loginUser, validateToken,
+  seedAdmin, registerUser, loginUser, logoutUser, validateToken,
   approveUser, approveUserWithRole, rejectUser,
   getPendingUsers, getRecruiters, changePassword, hashPassword,
   createTask, getAllTasks, getTasksForUser, completeTask, uncompleteTask, deleteTask,
