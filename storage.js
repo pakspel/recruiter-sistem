@@ -302,7 +302,14 @@ function createTask(title, description, assignedTo) {
 function getAllTasks() {
   return db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all().map(rowToTask);
 }
-function getTasksForUser(discordId) {
+function getTasksForUser(discordId, login) {
+  // BUG FIX: personal tasks are stored with login as assigned_to (set by admin panel),
+  // but completion tracking uses discordId. We match BOTH so personal tasks appear correctly.
+  if (login) {
+    return db.prepare(
+      "SELECT * FROM tasks WHERE assigned_to='all' OR assigned_to=? OR assigned_to=? ORDER BY created_at DESC"
+    ).all(discordId, login.toLowerCase()).map(rowToTask);
+  }
   return db.prepare("SELECT * FROM tasks WHERE assigned_to='all' OR assigned_to=? ORDER BY created_at DESC").all(discordId).map(rowToTask);
 }
 function completeTask(taskId, discordId) {

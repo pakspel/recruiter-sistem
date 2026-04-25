@@ -112,7 +112,9 @@ app.delete('/api/admin/tasks/:id', requireAdmin, (req, res) => {
 
 app.get('/api/tasks', requireRecruiter, (req, res) => {
   const discordId = storage.getDiscordIdByLogin(req.session.login);
-  res.json(storage.getTasksForUser(discordId || req.session.login));
+  // BUG FIX: без привязки Discord задания не показываем — нельзя отмечать выполнение
+  if (!discordId) return res.json([]);
+  res.json(storage.getTasksForUser(discordId, req.session.login));
 });
 
 app.post('/api/tasks/:id/complete', requireRecruiter, (req, res) => {

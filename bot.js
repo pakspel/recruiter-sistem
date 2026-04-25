@@ -374,8 +374,10 @@ client.on('interactionCreate', async (interaction) => {
           });
         }
 
-        // Берём задания для этого пользователя (все + личные)
-        const tasks = storage.getTasksForUser(interaction.user.id);
+        // BUG FIX: personal tasks have assigned_to = login (string), not discordId.
+        // Look up the linked account login so personal tasks are found correctly.
+        const linkedUser = storage.getUserByDiscordId(interaction.user.id);
+        const tasks = storage.getTasksForUser(interaction.user.id, linkedUser ? linkedUser.login : null);
 
         if (!tasks.length) {
           return interaction.editReply({
