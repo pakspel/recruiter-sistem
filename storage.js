@@ -32,6 +32,7 @@ const DEFAULT_CONFIG = {
 
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS recruiters (
@@ -54,7 +55,8 @@ db.exec(`
     password_hash  TEXT NOT NULL,
     approved       INTEGER DEFAULT 0,
     role           TEXT DEFAULT 'recruiter',
-    created_at     TEXT
+    created_at     TEXT,
+    discord_id     TEXT DEFAULT NULL
   );
   CREATE TABLE IF NOT EXISTS tokens (
     token      TEXT PRIMARY KEY,
@@ -76,39 +78,105 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY, value TEXT
   );
+
+  -- Relational history: replaces JSON history column
+  CREATE TABLE IF NOT EXISTS points_history (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    TEXT NOT NULL,
+    delta      INTEGER NOT NULL,
+    action     TEXT NOT NULL,
+    actor_id   TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_ph_user ON points_history(user_id, created_at DESC);
+
+  -- Relational completions: replaces JSON completed_by column
+  CREATE TABLE IF NOT EXISTS task_completions (
+    task_id      TEXT NOT NULL,
+    discord_id   TEXT NOT NULL,
+    completed_at TEXT NOT NULL,
+    PRIMARY KEY (task_id, discord_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_tc_discord ON task_completions(discord_id);
+
+  -- One-time codes for Discord account linking (TTL = 5 min)
+  CREATE TABLE IF NOT EXISTS link_codes (
+    code       TEXT PRIMARY KEY,
+    discord_id TEXT NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
 `);
+
+// Soft migrations for existing DBs
+try { db.exec("ALTER TABLE users ADD COLUMN discord_id TEXT DEFAULT NULL"); } catch (_) {}
+try { db.exec("ALTER TABLE recruiters ADD COLUMN total_accepted INTEGER DEFAULT 0"); } catch (_) {}
+try { db.exec("ALTER TABLE recruiters ADD COLUMN total_rejected INTEGER DEFAULT 0"); } catch (_) {}
+
+// One-time data migration: JSON columns -> relational tables
+(function migrateJsonToRelational() {
+  const migrated = db.prepare("SELECT value FROM meta WHERE key='json_migrated'").get();
+  if (migrated) return;
+
+  db.transaction(() => {
+    const insertH = db.prepare(
+      'INSERT OR IGNORE INTO points_history (user_id, delta, action, actor_id, created_at) VALUES (?,?,?,?,?)'
+    );
+    for (const row of db.prepare('SELECT user_id, history FROM recruiters').all()) {
+      try {
+        const entries = JSON.parse(row.history || '[]');
+        for (const e of entries)
+          insertH.run(row.user_id, e.delta ?? 0, e.action ?? '', e.actorId ?? null, e.date ?? new Date().toISOString());
+      } catch (_) {}
+    }
+
+    const insertC = db.prepare(
+      'INSERT OR IGNORE INTO task_completions (task_id, discord_id, completed_at) VALUES (?,?,?)'
+    );
+    const now = new Date().toISOString();
+    for (const row of db.prepare('SELECT task_id, completed_by FROM tasks').all()) {
+      try {
+        const ids = JSON.parse(row.completed_by || '[]');
+        for (const id of ids) insertC.run(row.task_id, id, now);
+      } catch (_) {}
+    }
+
+    db.prepare("INSERT OR REPLACE INTO meta (key,value) VALUES ('json_migrated','1')").run();
+  })();
+  console.log('Migration: JSON columns -> relational tables complete');
+})();
 
 if (!db.prepare("SELECT 1 FROM config WHERE key='main'").get())
   db.prepare("INSERT INTO config (key,value) VALUES ('main',?)").run(JSON.stringify(DEFAULT_CONFIG));
 
 // ── Helpers ───────────────────────────────────────────────
 
-// ── Password hashing (bcrypt) ─────────────────────────────
-// Новые пароли всегда хешируются через bcrypt (cost 12).
-// Миграция: если в БД ещё лежит старый sha256-хеш — при первом
-// успешном входе автоматически перехеширует в bcrypt.
-
 const BCRYPT_ROUNDS = 12;
 
-function hashPassword(pw) {
-  return bcrypt.hashSync(pw, BCRYPT_ROUNDS);
-}
+function hashPassword(pw) { return bcrypt.hashSync(pw, BCRYPT_ROUNDS); }
 
-/** Сравнивает пароль с хешем; возвращает true при совпадении.
- *  Поддерживает оба формата: bcrypt ($2b$…) и legacy sha256. */
 function verifyPassword(pw, stored) {
-  if (stored.startsWith('$2')) {
-    return bcrypt.compareSync(pw, stored);
-  }
-  // Старый sha256-хеш — проверяем по-старому
+  if (stored.startsWith('$2')) return bcrypt.compareSync(pw, stored);
   return crypto.createHash('sha256').update(pw).digest('hex') === stored;
 }
 
-// Оставляем для обратной совместимости (используется в seedAdmin)
-function hashPasswordLegacy(pw) { return crypto.createHash('sha256').update(pw).digest('hex'); }
 function isCurator(points) { return points >= CURATOR_MIN; }
 
-function rowToRecruiter(row) {
+function computeStatus(points) {
+  if (isCurator(points)) return 'curator';
+  if (points <= 0)        return 'kicked';
+  if (points <= 5)        return 'danger';
+  if (points <= 10)       return 'warning';
+  return 'active';
+}
+
+const stmtHistory = db.prepare(
+  'SELECT delta, action, actor_id AS actorId, created_at AS date FROM points_history WHERE user_id=? ORDER BY created_at DESC LIMIT 50'
+);
+const stmtCompletions = db.prepare(
+  'SELECT discord_id FROM task_completions WHERE task_id=?'
+);
+
+function rowToRecruiter(row, { includeHistory = true } = {}) {
   if (!row) return null;
   return {
     discordId:      row.user_id,
@@ -121,15 +189,21 @@ function rowToRecruiter(row) {
     weeklyActivity: JSON.parse(row.weekly_activity || '[]'),
     joinedAt:       row.joined_at,
     status:         row.status,
-    history:        JSON.parse(row.history || '[]'),
+    history:        includeHistory ? stmtHistory.all(row.user_id) : [],
     _prevEarned:    row.prev_earned
   };
 }
 
 function rowToTask(row) {
-  return { id: row.task_id, title: row.title, description: row.description,
-           assignedTo: row.assigned_to, createdAt: row.created_at,
-           completedBy: JSON.parse(row.completed_by || '[]') };
+  const completedBy = stmtCompletions.all(row.task_id).map(r => r.discord_id);
+  return {
+    id:          row.task_id,
+    title:       row.title,
+    description: row.description,
+    assignedTo:  row.assigned_to,
+    createdAt:   row.created_at,
+    completedBy
+  };
 }
 
 // ── Recruiters ────────────────────────────────────────────
@@ -137,7 +211,8 @@ function rowToTask(row) {
 function getAll() {
   const result = {};
   for (const row of db.prepare('SELECT * FROM recruiters').all()) {
-    const r = rowToRecruiter(row); result[r.discordId] = r;
+    const r = rowToRecruiter(row, { includeHistory: false });
+    result[r.discordId] = r;
   }
   return result;
 }
@@ -157,33 +232,62 @@ function register(userId, username, displayName) {
 function addPoints(userId, amount, reason, actorId = null, type = null) {
   const row = db.prepare('SELECT * FROM recruiters WHERE user_id=?').get(userId);
   if (!row) return null;
-  const rec = rowToRecruiter(row);
-  rec.points = Math.max(0, rec.points + amount);
-  if (amount > 0) rec.totalEarned = (rec.totalEarned || 0) + amount;
-  rec.history.unshift({ date: new Date().toISOString(), action: reason, delta: amount, actorId });
-  rec.history = rec.history.slice(0, 50);
-  if (!isCurator(rec.points)) {
-    if (rec.points <= 0)       rec.status = 'kicked';
-    else if (rec.points <= 5)  rec.status = 'danger';
-    else if (rec.points <= 10) rec.status = 'warning';
-    else                        rec.status = 'active';
-  } else { rec.status = 'curator'; }
 
-  // Track accepted/rejected counters
+  const newPoints   = Math.max(0, row.points + amount);
+  const newEarned   = amount > 0 ? (row.total_earned || 0) + amount : (row.total_earned || 0);
+  const newStatus   = computeStatus(newPoints);
   const acceptedInc = type === 'accepted' ? 1 : 0;
   const rejectedInc = type === 'rejected' ? 1 : 0;
+  const now         = new Date().toISOString();
 
-  db.prepare(`UPDATE recruiters
-    SET points=?, total_earned=?, history=?, status=?,
-        total_accepted = COALESCE(total_accepted, 0) + ?,
-        total_rejected = COALESCE(total_rejected, 0) + ?
-    WHERE user_id=?`)
-    .run(rec.points, rec.totalEarned, JSON.stringify(rec.history), rec.status,
-         acceptedInc, rejectedInc, userId);
-  return rec;
+  db.transaction(() => {
+    db.prepare(`UPDATE recruiters
+      SET points=?, total_earned=?, status=?,
+          total_accepted = COALESCE(total_accepted,0) + ?,
+          total_rejected = COALESCE(total_rejected,0) + ?
+      WHERE user_id=?`)
+      .run(newPoints, newEarned, newStatus, acceptedInc, rejectedInc, userId);
+    db.prepare('INSERT INTO points_history (user_id, delta, action, actor_id, created_at) VALUES (?,?,?,?,?)')
+      .run(userId, amount, reason || 'Ручное начисление', actorId, now);
+  })();
+
+  return get(userId);
 }
 
 function remove(userId) { db.prepare('DELETE FROM recruiters WHERE user_id=?').run(userId); }
+
+// ── Points history ────────────────────────────────────────
+
+function getPointsHistory(userId, limit = 100, offset = 0) {
+  const rows = db.prepare(
+    'SELECT id, delta, action, actor_id AS actorId, created_at AS date FROM points_history WHERE user_id=? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  ).all(userId, limit, offset);
+  const { total } = db.prepare('SELECT COUNT(*) AS total FROM points_history WHERE user_id=?').get(userId);
+  return { rows, total };
+}
+
+function getAllPointsHistory({ userId, dateFrom, dateTo, limit = 100, offset = 0 } = {}) {
+  const conditions = ['1=1'];
+  const params = [];
+  if (userId)   { conditions.push('ph.user_id=?');    params.push(userId); }
+  if (dateFrom) { conditions.push('ph.created_at>=?'); params.push(dateFrom); }
+  if (dateTo)   { conditions.push('ph.created_at<=?'); params.push(dateTo); }
+  const where = conditions.join(' AND ');
+
+  const rows = db.prepare(
+    `SELECT ph.id, ph.user_id, r.display_name AS displayName,
+            ph.delta, ph.action, ph.actor_id AS actorId, ph.created_at AS date
+     FROM points_history ph
+     LEFT JOIN recruiters r ON r.user_id = ph.user_id
+     WHERE ${where} ORDER BY ph.created_at DESC LIMIT ? OFFSET ?`
+  ).all(...params, limit, offset);
+
+  const { total } = db.prepare(
+    `SELECT COUNT(*) AS total FROM points_history ph WHERE ${where}`
+  ).get(...params);
+
+  return { rows, total };
+}
 
 // ── Config ────────────────────────────────────────────────
 
@@ -205,28 +309,34 @@ function getRank(points, config) {
 }
 
 function doWeeklyBurn() {
-  const burn = getConfig().weeklyBurn || 5;
+  const burn    = getConfig().weeklyBurn || 5;
   const results = { burned: [], kicked: [], skippedCurators: [] };
-  const upd = db.prepare('UPDATE recruiters SET points=?,status=?,history=?,weekly_activity=?,prev_earned=? WHERE user_id=?');
+  const now     = new Date().toISOString();
+
+  const stmtUpd  = db.prepare('UPDATE recruiters SET points=?,status=?,weekly_activity=?,prev_earned=? WHERE user_id=?');
+  const stmtInsH = db.prepare('INSERT INTO points_history (user_id, delta, action, actor_id, created_at) VALUES (?,?,?,?,?)');
+
   db.transaction(() => {
     for (const row of db.prepare('SELECT * FROM recruiters').all()) {
       if (row.status === 'kicked') continue;
-      const rec = rowToRecruiter(row);
-      if (isCurator(rec.points) || rec.status === 'curator') { results.skippedCurators.push(row.user_id); continue; }
-      const wasActive = rec.totalEarned !== (rec._prevEarned || 0);
-      rec.weeklyActivity = [wasActive, ...rec.weeklyActivity].slice(0, 8);
-      const prevEarned = rec.totalEarned;
-      rec.points = Math.max(0, rec.points - burn);
-      rec.history.unshift({ date: new Date().toISOString(), action: `Еженедельное списание (-${burn})`, delta: -burn, actorId: 'system' });
-      rec.history = rec.history.slice(0, 50);
-      if (rec.points <= 0)       { rec.status = 'kicked';  results.kicked.push(row.user_id); }
-      else if (rec.points <= 5)  { rec.status = 'danger';  results.burned.push(row.user_id); }
-      else if (rec.points <= 10)   rec.status = 'warning';
-      else                          rec.status = 'active';
-      upd.run(rec.points, rec.status, JSON.stringify(rec.history), JSON.stringify(rec.weeklyActivity), prevEarned, row.user_id);
+      const rec = rowToRecruiter(row, { includeHistory: false });
+      if (isCurator(rec.points)) { results.skippedCurators.push(row.user_id); continue; }
+
+      const wasActive   = rec.totalEarned !== (rec._prevEarned || 0);
+      const newActivity = [wasActive, ...rec.weeklyActivity].slice(0, 8);
+      const prevEarned  = rec.totalEarned;
+      const newPoints   = Math.max(0, rec.points - burn);
+      const newStatus   = computeStatus(newPoints);
+
+      stmtUpd.run(newPoints, newStatus, JSON.stringify(newActivity), prevEarned, row.user_id);
+      stmtInsH.run(row.user_id, -burn, `Еженедельное списание (-${burn})`, 'system', now);
+
+      if (newStatus === 'kicked')       results.kicked.push(row.user_id);
+      else if (newStatus === 'danger')  results.burned.push(row.user_id);
     }
   })();
-  db.prepare("INSERT OR REPLACE INTO meta (key,value) VALUES ('lastWeeklyBurn',?)").run(new Date().toISOString());
+
+  db.prepare("INSERT OR REPLACE INTO meta (key,value) VALUES ('lastWeeklyBurn',?)").run(now);
   return results;
 }
 
@@ -237,7 +347,7 @@ function seedAdmin(login, password) {
   if (!db.prepare('SELECT 1 FROM users WHERE login=?').get(key)) {
     db.prepare(`INSERT INTO users (login,original_login,password_hash,approved,role,created_at) VALUES (?,?,?,1,'admin',?)`)
       .run(key, login, hashPassword(password), new Date().toISOString());
-    console.log(`✅ Admin user "${login}" created`);
+    console.log(`Admin user "${login}" created`);
   }
 }
 
@@ -251,16 +361,14 @@ function registerUser(login, password) {
 }
 
 function loginUser(login, password) {
-  const key = login.toLowerCase();
+  const key  = login.toLowerCase();
   const user = db.prepare('SELECT * FROM users WHERE login=?').get(key);
   if (!user) return { ok: false, error: 'Неверный логин или пароль' };
   if (!verifyPassword(password, user.password_hash)) return { ok: false, error: 'Неверный логин или пароль' };
   if (!user.approved) return { ok: false, error: 'pending', pending: true };
 
-  // Плавная миграция: перехешируем sha256 → bcrypt при первом входе
-  if (!user.password_hash.startsWith('$2')) {
+  if (!user.password_hash.startsWith('$2'))
     db.prepare('UPDATE users SET password_hash=? WHERE login=?').run(hashPassword(password), key);
-  }
 
   const token = crypto.randomBytes(32).toString('hex');
   db.prepare('INSERT OR REPLACE INTO tokens (token,login,role,created_at) VALUES (?,?,?,?)')
@@ -305,7 +413,6 @@ function changePassword(login, oldPassword, newPassword) {
   if (!user) return { ok: false, error: 'Пользователь не найден' };
   if (!verifyPassword(oldPassword, user.password_hash)) return { ok: false, error: 'Неверный старый пароль' };
   db.prepare('UPDATE users SET password_hash=? WHERE login=?').run(hashPassword(newPassword), login.toLowerCase());
-  // Инвалидируем все активные токены пользователя — безопасность
   db.prepare('DELETE FROM tokens WHERE login=?').run(user.original_login);
   return { ok: true };
 }
@@ -318,7 +425,7 @@ function getAllUsersForAdmin() {
 }
 
 function setUserRole(login, role) {
-  const key = login.toLowerCase();
+  const key     = login.toLowerCase();
   const userRow = db.prepare('SELECT original_login FROM users WHERE login=?').get(key);
   if (!userRow) return false;
   db.prepare('UPDATE users SET role=? WHERE login=?').run(role, key);
@@ -328,19 +435,31 @@ function setUserRole(login, role) {
 
 // ── Tasks ─────────────────────────────────────────────────
 
-function createTask(title, description, assignedTo) {
-  const id = crypto.randomBytes(8).toString('hex');
-  const now = new Date().toISOString();
-  db.prepare(`INSERT INTO tasks (task_id,title,description,assigned_to,created_at,completed_by) VALUES (?,?,?,?,?,'[]')`)
-    .run(id, title, description || '', assignedTo || 'all', now);
-  return { id, title, description: description || '', assignedTo: assignedTo || 'all', createdAt: now, completedBy: [] };
+/**
+ * Нормализует assignedTo: логин -> discordId, чтобы устранить
+ * путаницу login vs discordId при назначении заданий из веб-панели.
+ */
+function resolveAssignedTo(assignedTo) {
+  if (!assignedTo || assignedTo === 'all') return 'all';
+  if (/^\d{15,20}$/.test(assignedTo)) return assignedTo;
+  const discordId = getDiscordIdByLogin(assignedTo);
+  return discordId || assignedTo;
 }
+
+function createTask(title, description, assignedTo) {
+  const id         = crypto.randomBytes(8).toString('hex');
+  const now        = new Date().toISOString();
+  const normalised = resolveAssignedTo(assignedTo);
+  db.prepare(`INSERT INTO tasks (task_id,title,description,assigned_to,created_at,completed_by) VALUES (?,?,?,?,?,'[]')`)
+    .run(id, title, description || '', normalised, now);
+  return { id, title, description: description || '', assignedTo: normalised, createdAt: now, completedBy: [] };
+}
+
 function getAllTasks() {
   return db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all().map(rowToTask);
 }
+
 function getTasksForUser(discordId, login) {
-  // BUG FIX: personal tasks are stored with login as assigned_to (set by admin panel),
-  // but completion tracking uses discordId. We match BOTH so personal tasks appear correctly.
   if (login) {
     return db.prepare(
       "SELECT * FROM tasks WHERE assigned_to='all' OR assigned_to=? OR assigned_to=? ORDER BY created_at DESC"
@@ -348,70 +467,93 @@ function getTasksForUser(discordId, login) {
   }
   return db.prepare("SELECT * FROM tasks WHERE assigned_to='all' OR assigned_to=? ORDER BY created_at DESC").all(discordId).map(rowToTask);
 }
+
 function completeTask(taskId, discordId) {
   const row = db.prepare('SELECT * FROM tasks WHERE task_id=?').get(taskId);
   if (!row) return null;
-  const completedBy = JSON.parse(row.completed_by || '[]');
-  if (!completedBy.includes(discordId)) {
-    completedBy.push(discordId);
-    db.prepare('UPDATE tasks SET completed_by=? WHERE task_id=?').run(JSON.stringify(completedBy), taskId);
-  }
-  return rowToTask({ ...row, completed_by: JSON.stringify(completedBy) });
+  db.prepare('INSERT OR IGNORE INTO task_completions (task_id, discord_id, completed_at) VALUES (?,?,?)')
+    .run(taskId, discordId, new Date().toISOString());
+  return rowToTask(row);
 }
 
 function uncompleteTask(taskId, discordId) {
   const row = db.prepare('SELECT * FROM tasks WHERE task_id=?').get(taskId);
   if (!row) return null;
-  const completedBy = JSON.parse(row.completed_by || '[]').filter(id => id !== discordId);
-  db.prepare('UPDATE tasks SET completed_by=? WHERE task_id=?').run(JSON.stringify(completedBy), taskId);
-  return rowToTask({ ...row, completed_by: JSON.stringify(completedBy) });
+  db.prepare('DELETE FROM task_completions WHERE task_id=? AND discord_id=?').run(taskId, discordId);
+  return rowToTask(row);
 }
+
 function deleteTask(taskId) {
-  return db.prepare('DELETE FROM tasks WHERE task_id=?').run(taskId).changes > 0;
+  db.transaction(() => {
+    db.prepare('DELETE FROM task_completions WHERE task_id=?').run(taskId);
+    db.prepare('DELETE FROM tasks WHERE task_id=?').run(taskId);
+  })();
+  return true;
 }
 
 // ── Discord linking ───────────────────────────────────────
 
-// Миграции (для существующих БД)
-try { db.exec("ALTER TABLE users ADD COLUMN discord_id TEXT DEFAULT NULL"); } catch (_) {}
-try { db.exec("ALTER TABLE recruiters ADD COLUMN total_accepted INTEGER DEFAULT 0"); } catch (_) {}
-try { db.exec("ALTER TABLE recruiters ADD COLUMN total_rejected INTEGER DEFAULT 0"); } catch (_) {}
-
-/** Привязать Discord ID к аккаунту пользователя */
 function linkDiscordToUser(login, discordId) {
-  // Проверяем — не привязан ли этот Discord к другому аккаунту
-  const existing = db.prepare("SELECT original_login FROM users WHERE discord_id=? AND login!=?").get(discordId, login.toLowerCase());
+  const existing = db.prepare("SELECT original_login FROM users WHERE discord_id=? AND login!=?")
+    .get(discordId, login.toLowerCase());
   if (existing) return { ok: false, error: `Discord уже привязан к аккаунту ${existing.original_login}` };
   db.prepare("UPDATE users SET discord_id=? WHERE login=?").run(discordId, login.toLowerCase());
   return { ok: true };
 }
 
-/** Отвязать Discord от аккаунта */
 function unlinkDiscord(login) {
   db.prepare("UPDATE users SET discord_id=NULL WHERE login=?").run(login.toLowerCase());
   return { ok: true };
 }
 
-/** Получить логин пользователя по Discord ID */
 function getUserByDiscordId(discordId) {
   return db.prepare("SELECT original_login as login, role, discord_id FROM users WHERE discord_id=? AND approved=1").get(discordId) || null;
 }
 
-/** Получить Discord ID пользователя по логину */
 function getDiscordIdByLogin(login) {
   const row = db.prepare("SELECT discord_id FROM users WHERE login=?").get(login.toLowerCase());
   return row ? row.discord_id : null;
 }
 
-// ── Управление рекрутами (admin) ──────────────────────────
+// ── Discord linking via one-time code ─────────────────────
 
-/** Добавить рекрута по Discord ID вручную (без регистрации) */
+/**
+ * Бот вызывает эту функцию при /привязать.
+ * Возвращает { ok: true, code } или { ok: false, error }.
+ * Код действует 5 минут, одноразовый.
+ */
+function generateLinkCode(discordId) {
+  db.prepare('DELETE FROM link_codes WHERE expires_at < ? OR discord_id = ?').run(Date.now(), discordId);
+  const existing = getUserByDiscordId(discordId);
+  if (existing) return { ok: false, alreadyLinked: true, login: existing.login };
+
+  const code      = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+  db.prepare('INSERT INTO link_codes (code, discord_id, expires_at) VALUES (?,?,?)').run(code, discordId, expiresAt);
+  return { ok: true, code };
+}
+
+/**
+ * Пользователь вводит 6-значный код на сайте.
+ * Код удаляется сразу после использования.
+ */
+function consumeLinkCode(login, code) {
+  db.prepare('DELETE FROM link_codes WHERE expires_at < ?').run(Date.now());
+  const row = db.prepare('SELECT * FROM link_codes WHERE code=?').get(String(code).trim());
+  if (!row) return { ok: false, error: 'Код не найден или истёк. Запроси новый командой /привязать в боте.' };
+  const discordId = row.discord_id;
+  db.prepare('DELETE FROM link_codes WHERE code=?').run(String(code).trim());
+  return linkDiscordToUser(login, discordId);
+}
+
+// ── Admin: recruiter management ───────────────────────────
+
 function adminAddRecruiter(discordId, displayName, adminLogin) {
   if (!discordId || !/^\d{15,20}$/.test(discordId))
     return { ok: false, error: 'Некорректный Discord ID (17–19 цифр)' };
   if (db.prepare('SELECT 1 FROM recruiters WHERE user_id=?').get(discordId))
     return { ok: false, error: 'Рекрут с таким Discord ID уже существует' };
-  const name = (displayName || '').trim() || `user_${discordId.slice(-4)}`;
+  const name   = (displayName || '').trim() || `user_${discordId.slice(-4)}`;
   const config = getConfig();
   db.prepare(`INSERT INTO recruiters (user_id,username,display_name,points,total_earned,weekly_activity,joined_at,status,history,prev_earned)
     VALUES (?,?,?,?,0,'[]',?,'active','[]',0)`)
@@ -419,7 +561,6 @@ function adminAddRecruiter(discordId, displayName, adminLogin) {
   return { ok: true, recruiter: get(discordId) };
 }
 
-/** Переименовать рекрута */
 function renameRecruiter(discordId, newName) {
   if (!newName || !newName.trim()) return { ok: false, error: 'Введи имя' };
   const trimmed = newName.trim().slice(0, 40);
@@ -444,5 +585,7 @@ module.exports = {
   createTask, getAllTasks, getTasksForUser, completeTask, uncompleteTask, deleteTask,
   getAllUsersForAdmin, setUserRole,
   linkDiscordToUser, unlinkDiscord, getUserByDiscordId, getDiscordIdByLogin,
-  adminAddRecruiter, renameRecruiter
+  adminAddRecruiter, renameRecruiter,
+  generateLinkCode, consumeLinkCode,
+  getPointsHistory, getAllPointsHistory,
 };

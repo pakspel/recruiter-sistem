@@ -267,6 +267,28 @@ app.get('/api/auth/discord-status', requireToken, (req, res) => {
   res.json({ discordId: discordId || null, linked: !!discordId });
 });
 
+/**
+ * Привязать Discord через одноразовый код из бота (/привязать).
+ * Тело: { code: "123456" }
+ */
+app.post('/api/auth/link-discord-code', requireToken, (req, res) => {
+  const { code } = req.body;
+  if (!code || !/^\d{6}$/.test(String(code).trim()))
+    return res.status(400).json({ error: 'Укажи 6-значный код из Discord-бота.' });
+  res.json(storage.consumeLinkCode(req.session.login, code));
+});
+
+/**
+ * Бот вызывает этот эндпоинт, чтобы сгенерировать код для пользователя.
+ * Требует API-ключ. Тело: { discordId: "..." }
+ */
+app.post('/api/auth/generate-link-code', requireApiKey, (req, res) => {
+  const { discordId } = req.body;
+  if (!discordId || !/^\d{15,20}$/.test(discordId))
+    return res.status(400).json({ error: 'Некорректный discordId' });
+  res.json(storage.generateLinkCode(discordId));
+});
+
 /** Задания по Discord ID — для бота */
 app.get('/api/tasks/by-discord/:discordId', requireApiKey, (req, res) => {
   const user = storage.getUserByDiscordId(req.params.discordId);
@@ -279,6 +301,26 @@ app.get('/api/tasks/by-discord/:discordId', requireApiKey, (req, res) => {
 
 app.get('/api/config', (req, res) => res.json(storage.getConfig()));
 app.post('/api/config', requireApiKey, (req, res) => res.json(storage.setConfig(req.body)));
+
+// ── История баллов ────────────────────────────────────────
+
+/** История баллов одного рекрута (для кабинета) */
+app.get('/api/recruiter/:id/history', (req, res) => {
+  const limit  = Math.min(parseInt(req.query.limit)  || 100, 500);
+  const offset = parseInt(req.query.offset) || 0;
+  const result = storage.getPointsHistory(req.params.id, limit, offset);
+  res.json(result);
+});
+
+/** История баллов всех рекрутов с фильтрами (для страницы /history) */
+app.get('/api/history', requireAdmin, (req, res) => {
+  const limit    = Math.min(parseInt(req.query.limit)  || 100, 500);
+  const offset   = parseInt(req.query.offset) || 0;
+  const userId   = req.query.userId   || undefined;
+  const dateFrom = req.query.dateFrom || undefined;
+  const dateTo   = req.query.dateTo   || undefined;
+  res.json(storage.getAllPointsHistory({ userId, dateFrom, dateTo, limit, offset }));
+});
 
 app.post('/api/register', requireApiKey, (req, res) => {
   const { userId, username, displayName } = req.body;

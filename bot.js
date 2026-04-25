@@ -436,6 +436,7 @@ client.on('interactionCreate', async (interaction) => {
 
       case 'привязать': {
         const siteUrl = process.env.SITE_URL || 'твой-сайт.railway.app';
+
         // Проверяем, не привязан ли уже
         const existing = storage.getUserByDiscordId(interaction.user.id);
         if (existing) {
@@ -444,6 +445,16 @@ client.on('interactionCreate', async (interaction) => {
             ephemeral: true
           });
         }
+
+        // Генерируем одноразовый код
+        const result = storage.generateLinkCode(interaction.user.id);
+        if (!result.ok) {
+          return interaction.reply({
+            content: `⚠️ ${result.error || 'Ошибка генерации кода. Попробуй снова.'}`,
+            ephemeral: true
+          });
+        }
+
         return interaction.reply({
           content: [
             '🔗 **Привязка Discord к аккаунту на сайте**',
@@ -451,7 +462,8 @@ client.on('interactionCreate', async (interaction) => {
             `1. Зайди на **${siteUrl}/cabinet.html**`,
             '2. Войди в свой аккаунт',
             '3. Найди раздел **🔗 Привязка Discord**',
-            `4. Введи свой Discord ID: \`${interaction.user.id}\` и нажми **Привязать**`,
+            `4. Введи одноразовый код: \`\`\`${result.code}\`\`\``,
+            '⏱️ Код действует **5 минут**. Не показывай его другим!',
             '',
             '✨ После этого команда **/задания** покажет твои задания прямо в Discord!'
           ].join('\n'),
