@@ -151,40 +151,6 @@
   /* Пустой список */
   .empty { text-align: center; padding: 40px; font-family: 'IBM Plex Mono'; font-size: 12px; color: var(--muted); }
 
-  /* ── Мёртвые аккаунты ── */
-  .orphan-grid { display: flex; flex-direction: column; gap: 8px; }
-  .orphan-card {
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
-    background: rgba(230,57,70,0.04); border: 1px solid rgba(230,57,70,0.18);
-    padding: 14px 18px;
-    clip-path: polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px));
-    transition: background .15s;
-  }
-  .orphan-card:hover { background: rgba(230,57,70,0.08); }
-  .orphan-info { display: flex; flex-direction: column; gap: 4px; }
-  .orphan-login { font-family: 'Rajdhani'; font-weight: 700; font-size: 16px; color: var(--white); }
-  .orphan-meta  { font-family: 'IBM Plex Mono'; font-size: 10px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
-  .orphan-reason {
-    display: inline-block; font-family: 'IBM Plex Mono'; font-size: 9px; letter-spacing: 1px;
-    padding: 2px 8px; border: 1px solid rgba(230,57,70,0.35); color: #f28b82;
-    clip-path: polygon(0 0,calc(100% - 3px) 0,100% 3px,100% 100%,3px 100%,0 calc(100% - 3px));
-  }
-  .btn-del-orphan {
-    font-family: 'Rajdhani'; font-weight: 700; font-size: 12px; letter-spacing: 1px;
-    padding: 7px 18px; border: 1px solid rgba(230,57,70,0.4); color: var(--red);
-    background: transparent; cursor: pointer; transition: .2s;
-    clip-path: polygon(0 0,calc(100% - 5px) 0,100% 5px,100% 100%,5px 100%,0 calc(100% - 5px));
-  }
-  .btn-del-orphan:hover { background: rgba(230,57,70,0.14); border-color: var(--red); }
-  .orphan-count-badge {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-width: 20px; height: 20px; padding: 0 6px;
-    background: rgba(230,57,70,0.15); border: 1px solid rgba(230,57,70,0.35);
-    border-radius: 99px; font-family: 'IBM Plex Mono'; font-size: 10px; color: var(--red);
-    margin-left: 8px;
-  }
-  .section-title.red-accent::before { background: var(--red); }
-
   /* Тост */
   .toast {
     position: fixed; bottom: 28px; right: 28px;
@@ -229,7 +195,6 @@
       </div>
     </div>
     <div class="nav-links">
-      <a href="/cabinet.html" class="nav-link">← КАБИНЕТ</a>
       <a href="/" class="nav-link">← РЕЙТИНГ</a>
     </div>
   </header>
@@ -257,21 +222,6 @@
       <input class="search-bar" id="searchInput" placeholder="Поиск по логину..." oninput="renderTable()"/>
       <div class="table-wrap">
         <div id="tableArea"><div class="loader">Загрузка</div></div>
-      </div>
-    </div>
-
-    <!-- Мёртвые кабинеты -->
-    <div class="section">
-      <div class="section-title red-accent">
-        МЁРТВЫЕ КАБИНЕТЫ
-        <span class="orphan-count-badge" id="orphanCount">—</span>
-      </div>
-      <div style="font-family:'IBM Plex Mono';font-size:11px;color:var(--muted);margin-bottom:14px;line-height:1.7;">
-        Личные кабинеты, чей рекрут был удалён из системы или чей Discord не привязан
-        ни к одному активному рекруту. Их можно безопасно удалить.
-      </div>
-      <div class="orphan-grid" id="orphanGrid">
-        <div class="loader">Загрузка</div>
       </div>
     </div>
 
@@ -315,7 +265,6 @@ async function init() {
   document.getElementById('accessDenied').style.display = 'none';
   document.getElementById('content').style.display = 'block';
   loadUsers();
-  loadOrphans();
 }
 
 function showDenied() {
@@ -415,81 +364,6 @@ async function setRole(login, role) {
 
     const roleRu = role === 'admin' ? 'Администратор' : 'Рекрут';
     toast(`✓ ${login} → ${roleRu}`, role === 'admin' ? 'purple' : 'green');
-  } catch {
-    toast('Ошибка соединения', 'red');
-  }
-}
-
-let orphanUsers = [];
-
-async function loadOrphans() {
-  try {
-    const r = await fetch('/api/superadmin/orphaned-users', { headers: { 'x-token': authToken } });
-    orphanUsers = await r.json();
-    renderOrphans();
-  } catch {
-    document.getElementById('orphanGrid').innerHTML = '<div class="empty">⚠ Ошибка загрузки</div>';
-  }
-}
-
-function renderOrphans() {
-  const grid  = document.getElementById('orphanGrid');
-  const badge = document.getElementById('orphanCount');
-  badge.textContent = orphanUsers.length;
-
-  if (!orphanUsers.length) {
-    grid.innerHTML = '<div class="empty">✓ Мёртвых кабинетов нет</div>';
-    return;
-  }
-
-  const reasonLabel = {
-    no_recruiter:  '⚠ Рекрут удалён из системы',
-    never_linked:  '🔗 Никогда не был привязан'
-  };
-
-  grid.innerHTML = orphanUsers.map(u => `
-    <div class="orphan-card" id="ocard-${esc(u.login)}">
-      <div class="orphan-info">
-        <div class="orphan-login">${esc(u.login)}</div>
-        <div class="orphan-meta">
-          <span>📅 ${new Date(u.createdAt).toLocaleDateString('ru')}</span>
-          ${u.discordId ? `<span>🎮 Discord: ${esc(u.discordId)}</span>` : '<span>🎮 Discord не привязан</span>'}
-          <span class="orphan-reason">${reasonLabel[u.reason] || u.reason}</span>
-        </div>
-      </div>
-      <button class="btn-del-orphan" onclick="deleteOrphan('${esc(u.login)}')">🗑 УДАЛИТЬ</button>
-    </div>
-  `).join('');
-}
-
-async function deleteOrphan(login) {
-  if (!confirm(`Удалить кабинет «${login}»?\n\nЭто действие необратимо — пользователь потеряет доступ к сайту.`)) return;
-  try {
-    const r = await fetch(`/api/superadmin/users/${encodeURIComponent(login)}`, {
-      method: 'DELETE',
-      headers: { 'x-token': authToken }
-    });
-    const d = await r.json();
-    if (!d.ok) { toast('⚠ ' + (d.error || 'Ошибка'), 'red'); return; }
-
-    // Плавно убираем карточку
-    const card = document.getElementById('ocard-' + login);
-    if (card) {
-      card.style.transition = 'opacity .3s, transform .3s';
-      card.style.opacity = '0';
-      card.style.transform = 'translateX(10px)';
-      setTimeout(() => card.remove(), 320);
-    }
-
-    orphanUsers = orphanUsers.filter(u => u.login !== login);
-    setTimeout(() => {
-      document.getElementById('orphanCount').textContent = orphanUsers.length;
-      if (!orphanUsers.length)
-        document.getElementById('orphanGrid').innerHTML = '<div class="empty">✓ Мёртвых кабинетов нет</div>';
-    }, 330);
-
-    toast(`✓ Кабинет «${login}» удалён`, 'green');
-    loadUsers(); // обновляем общие счётчики
   } catch {
     toast('Ошибка соединения', 'red');
   }
