@@ -1,6 +1,7 @@
 const {
   Client, GatewayIntentBits, REST, Routes,
-  SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits
+  SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits,
+  ActionRowBuilder, ButtonBuilder, ButtonStyle
 } = require('discord.js');
 const storage = require('./storage');
 
@@ -394,13 +395,11 @@ client.on('interactionCreate', async (interaction) => {
         const embed = new EmbedBuilder()
           .setTitle(`📋 Задания — ${recruiter.displayName}`)
           .setDescription(lines.join('\n\n'))
-          .setColor(isDone => 0x60a5fa)
           .setColor(0x60a5fa)
           .addFields({ name: 'Прогресс', value: `${doneCount} / ${tasks.length} выполнено`, inline: true })
           .setTimestamp();
 
         // Кнопки для отметки выполнения (первые 5 невыполненных)
-        const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
         const undoneTasks = tasks.filter(t => !(t.completedBy || []).includes(interaction.user.id)).slice(0, 5);
         const rows = [];
 
