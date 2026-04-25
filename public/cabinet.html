@@ -340,13 +340,34 @@
         </div>
       </div>
       <div id="discordUnlinked">
-        <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px">Привяжи свой Discord, чтобы просматривать задания прямо в Discord командой <b style="color:var(--blue)">/задания</b>.<br>Свой Discord ID можно узнать через <b style="color:var(--blue)">/привязать</b> в Discord или в настройках Discord → «Расширенные» → «Режим разработчика».</div>
-        <div class="form-group">
-          <label class="form-label">Твой Discord ID <span style="color:var(--muted);font-weight:400">(17–19 цифр)</span></label>
-          <input class="form-input" id="discordIdInput" placeholder="123456789012345678" maxlength="20" type="text" inputmode="numeric">
+        <!-- Привязка через одноразовый код (рекомендуется) -->
+        <div style="background:rgba(88,166,255,0.07);border:1px solid rgba(88,166,255,0.25);padding:16px 18px;margin-bottom:18px;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))">
+          <div style="font-size:12px;color:var(--blue);letter-spacing:1.2px;text-transform:uppercase;font-family:'IBM Plex Mono';margin-bottom:10px">✨ Быстрая привязка через бот</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px">
+            1. Напиши <b style="color:var(--blue)">/привязать</b> в Discord-боте<br>
+            2. Скопируй полученный <b>6-значный код</b><br>
+            3. Вставь его ниже и нажми «Привязать»
+          </div>
+          <div class="form-group" style="margin-bottom:12px">
+            <label class="form-label">Код из бота <span style="color:var(--muted);font-weight:400">(6 цифр, действует 5 мин)</span></label>
+            <input class="form-input" id="discordCodeInput" placeholder="123456" maxlength="6" type="text" inputmode="numeric" style="font-family:'IBM Plex Mono';font-size:22px;letter-spacing:4px;text-align:center">
+          </div>
+          <div class="modal-msg" id="discordLinkMsg"></div>
+          <button class="btn-primary" onclick="linkDiscordByCode()">🔗 ПРИВЯЗАТЬ</button>
         </div>
-        <div class="modal-msg" id="discordLinkMsg"></div>
-        <button class="btn-primary" onclick="linkDiscord()">🔗 ПРИВЯЗАТЬ</button>
+
+        <!-- Резервный вариант: ручной ввод ID -->
+        <details style="margin-top:6px">
+          <summary style="font-size:12px;color:var(--muted);cursor:pointer;user-select:none">Альтернатива: ввести Discord ID вручную</summary>
+          <div style="padding-top:14px">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Свой Discord ID можно узнать в настройках Discord → «Расширенные» → «Режим разработчика», затем ПКМ на своём нике.</div>
+            <div class="form-group">
+              <label class="form-label">Discord ID <span style="color:var(--muted);font-weight:400">(17–19 цифр)</span></label>
+              <input class="form-input" id="discordIdInput" placeholder="123456789012345678" maxlength="20" type="text" inputmode="numeric">
+            </div>
+            <button class="btn-ghost" onclick="linkDiscord()" style="margin-top:8px">🔗 Привязать по ID</button>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -453,6 +474,25 @@ async function linkDiscord() {
     showToast('✅ Discord привязан!', 'green');
     await loadDiscordStatus(); // this sets currentDiscordId
     loadTasks(); // reload — now server returns tasks for linked discord
+  } catch { msgEl.className='modal-msg error'; msgEl.textContent='ОШИБКА СОЕДИНЕНИЯ'; }
+}
+
+async function linkDiscordByCode() {
+  const code  = (document.getElementById('discordCodeInput').value || '').trim();
+  const msgEl = document.getElementById('discordLinkMsg');
+  msgEl.className = 'modal-msg'; msgEl.textContent = '';
+  if (!/^\d{6}$/.test(code)) { msgEl.className='modal-msg error'; msgEl.textContent='КОД: 6 ЦИФР (ПОЛУЧИ В БОТЕ /ПРИВЯЗАТЬ)'; return; }
+  try {
+    const r = await fetch('/api/auth/link-discord-code', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','x-token':authToken},
+      body: JSON.stringify({ code })
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) { msgEl.className='modal-msg error'; msgEl.textContent=(d.error||'ОШИБКА').toUpperCase(); return; }
+    showToast('✅ Discord привязан через код!', 'green');
+    await loadDiscordStatus();
+    loadTasks();
   } catch { msgEl.className='modal-msg error'; msgEl.textContent='ОШИБКА СОЕДИНЕНИЯ'; }
 }
 
