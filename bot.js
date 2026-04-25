@@ -191,7 +191,7 @@ async function parseOtherBotMessage(message) {
     const recruiterId = m[1];
     const candidateId = m[2];
     if (!storage.get(recruiterId)) continue;
-    storage.addPoints(recruiterId, scoring.rejected, `Отклонил кандидата <@${candidateId}> (поймал нарушителя)`, 'bot-auto');
+    storage.addPoints(recruiterId, scoring.rejected, `Отклонил кандидата <@${candidateId}> (поймал нарушителя)`, 'bot-auto', 'rejected');
     results.push({ recruiterId, delta: +scoring.rejected, action: 'отклонил заявку' });
   }
 
