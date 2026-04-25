@@ -451,7 +451,8 @@ async function linkDiscord() {
     const d = await r.json();
     if (!r.ok || d.error) { msgEl.className='modal-msg error'; msgEl.textContent=(d.error||'ОШИБКА').toUpperCase(); return; }
     showToast('✅ Discord привязан!', 'green');
-    loadDiscordStatus();
+    await loadDiscordStatus(); // this sets currentDiscordId
+    loadTasks(); // reload — now server returns tasks for linked discord
   } catch { msgEl.className='modal-msg error'; msgEl.textContent='ОШИБКА СОЕДИНЕНИЯ'; }
 }
 
@@ -459,8 +460,10 @@ async function unlinkDiscord() {
   if (!confirm('Отвязать Discord от аккаунта?')) return;
   try {
     await fetch('/api/auth/unlink-discord', {method:'POST',headers:{'x-token':authToken}});
+    currentDiscordId = null; // BUG FIX: clear immediately so tasks hide right away
     showToast('Discord отвязан', 'green');
     loadDiscordStatus();
+    loadTasks(); // reload — server now returns [] without discord
   } catch { showToast('Ошибка', 'red'); }
 }
 
@@ -516,6 +519,11 @@ function renderTasks() {
   document.getElementById('sectionCount').textContent = tasks.length + ' заданий';
 
   if (!tasks.length) {
+    // BUG FIX: if no discord linked, tasks are hidden server-side — show clear reason
+    if (!currentDiscordId) {
+      container.innerHTML = `<div class="empty-tasks"><div class="icon">🔗</div>Привяжи Discord выше, чтобы видеть задания</div>`;
+      return;
+    }
     const msgs = {
       all: { icon: '📭', text: 'Заданий пока нет. Ожидайте от администратора.' },
       done: { icon: '✨', text: 'Нет выполненных заданий.' },
