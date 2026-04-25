@@ -569,58 +569,6 @@ function renameRecruiter(discordId, newName) {
   return { ok: true, recruiter: get(discordId) };
 }
 
-// ── Superadmin: orphaned accounts ─────────────────────────
-
-/**
- * Возвращает аккаунты личных кабинетов, чей рекрут был удалён из системы.
- * «Мёртвый» аккаунт — это запись в таблице users, у которой:
- *   - discord_id IS NOT NULL (был создан ботом и привязан)
- *   - И этого discord_id нет в таблице recruiters
- * Либо:
- *   - discord_id IS NULL (зарегистрирован вручную, но никогда не привязан и не имеет рекрута)
- *   И нет совпадающего рекрута по username
- */
-function getOrphanedUsers() {
-  // Аккаунты с привязанным Discord ID, которого нет среди рекрутов
-  const linkedOrphans = db.prepare(`
-    SELECT u.original_login AS login, u.role, u.created_at AS createdAt,
-           u.discord_id AS discordId, 'no_recruiter' AS reason
-    FROM users u
-    WHERE u.discord_id IS NOT NULL
-      AND u.discord_id NOT IN (SELECT user_id FROM recruiters)
-      AND u.role != 'admin'
-  `).all();
-
-  // Аккаунты без Discord ID, чей логин не совпадает ни с одним username рекрута
-  const unlinkedOrphans = db.prepare(`
-    SELECT u.original_login AS login, u.role, u.created_at AS createdAt,
-           NULL AS discordId, 'never_linked' AS reason
-    FROM users u
-    WHERE u.discord_id IS NULL
-      AND u.role = 'recruiter'
-      AND LOWER(u.login) NOT IN (SELECT LOWER(username) FROM recruiters)
-  `).all();
-
-  return [...linkedOrphans, ...unlinkedOrphans];
-}
-
-/**
- * Удаляет аккаунт личного кабинета (и все его токены).
- * Нельзя удалить admin / superadmin через этот метод.
- */
-function deleteUser(login) {
-  const key  = login.toLowerCase();
-  const user = db.prepare('SELECT role, original_login FROM users WHERE login=?').get(key);
-  if (!user)                   return { ok: false, error: 'Пользователь не найден' };
-  if (user.role === 'admin')   return { ok: false, error: 'Нельзя удалить администратора' };
-
-  db.transaction(() => {
-    db.prepare('DELETE FROM tokens WHERE login=?').run(user.original_login);
-    db.prepare('DELETE FROM users  WHERE login=?').run(key);
-  })();
-  return { ok: true };
-}
-
 // ── Compat shim ───────────────────────────────────────────
 
 function load() {
@@ -640,5 +588,4 @@ module.exports = {
   adminAddRecruiter, renameRecruiter,
   generateLinkCode, consumeLinkCode,
   getPointsHistory, getAllPointsHistory,
-  getOrphanedUsers, deleteUser,
 };

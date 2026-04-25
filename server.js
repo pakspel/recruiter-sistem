@@ -221,18 +221,6 @@ app.post('/api/superadmin/users/:login/role', requireSuperAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-/** GET /api/superadmin/orphaned-users — кабинеты без живого рекрута */
-app.get('/api/superadmin/orphaned-users', requireSuperAdmin, (req, res) => {
-  res.json(storage.getOrphanedUsers());
-});
-
-/** DELETE /api/superadmin/users/:login — удалить кабинет (только recruiter-роль) */
-app.delete('/api/superadmin/users/:login', requireSuperAdmin, (req, res) => {
-  if (req.params.login === 'PAKSPEL')
-    return res.status(400).json({ error: 'Нельзя удалить суперадмина' });
-  res.json(storage.deleteUser(req.params.login));
-});
-
 // ── Admin: управление рекрутами ───────────────────────────
 
 /** Список всех рекрутов в системе рейтинга */
