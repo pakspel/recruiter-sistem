@@ -76,7 +76,7 @@ const commands = [
   // ── Новые команды ──────────────────
   new SlashCommandBuilder()
     .setName('задания')
-    .setDescription('Показать мои задания (нужна привязка Discord в кабинете на сайте)'),
+    .setDescription('Показать мои задания'),
 
   new SlashCommandBuilder()
     .setName('привязать')
@@ -232,6 +232,25 @@ client.on('messageCreate', async (message) => {
 });
 
 client.on('interactionCreate', async (interaction) => {
+  // ── Button handler ────────────────────────────────────────
+  if (interaction.isButton()) {
+    const [action, taskId, targetDiscordId] = interaction.customId.split(':');
+
+    // Only the task owner can press the button
+    if (interaction.user.id !== targetDiscordId) {
+      return interaction.reply({ content: '❌ Это не твоё задание.', ephemeral: true });
+    }
+
+    if (action === 'complete_task') {
+      storage.completeTask(taskId, interaction.user.id);
+      await interaction.reply({ content: '✅ Задание отмечено как выполненное!', ephemeral: true });
+    } else if (action === 'uncomplete_task') {
+      storage.uncompleteTask(taskId, interaction.user.id);
+      await interaction.reply({ content: '↩ Отметка снята.', ephemeral: true });
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
   const config = storage.getConfig();
 
@@ -339,49 +358,79 @@ client.on('interactionCreate', async (interaction) => {
       // ── Новые команды ──────────────────
 
       case 'задания': {
-        // Ищем аккаунт, привязанный к этому Discord ID
-        const user = storage.getUserByDiscordId(interaction.user.id);
-        if (!user) {
-          const siteUrl = process.env.SITE_URL || 'сайт';
-          return interaction.reply({
+        await interaction.deferReply({ ephemeral: true });
+
+        // Ищем рекрута напрямую по Discord ID — без привязки аккаунта
+        const recruiter = storage.get(interaction.user.id);
+
+        if (!recruiter) {
+          return interaction.editReply({
             content: [
-              '❌ **Твой Discord не привязан к аккаунту.**',
+              '❌ **Ты не зарегистрирован в системе рекрутов.**',
               '',
-              `1. Зайди на **${siteUrl}/cabinet.html**`,
-              '2. Войди в аккаунт',
-              `3. В разделе **🔗 Привязка Discord** введи свой ID: \`${interaction.user.id}\``,
-              '',
-              'После привязки команда /задания будет работать!'
-            ].join('\n'),
-            ephemeral: true
+              'Обратись к администратору чтобы тебя добавили командой `/добавить_рекрута`.'
+            ].join('\n')
           });
         }
 
-        const tasks = storage.getTasksForUser(user.login);
+        // Берём задания для этого пользователя (все + личные)
+        const tasks = storage.getTasksForUser(interaction.user.id);
 
         if (!tasks.length) {
-          return interaction.reply({
-            content: `📋 **${user.login}** — заданий пока нет.`,
-            ephemeral: true
+          return interaction.editReply({
+            content: `📋 **${recruiter.displayName}** — заданий пока нет. Следи за обновлениями!`
           });
         }
 
-        const doneCount = tasks.filter(t => (t.completedBy || []).includes(user.login)).length;
+        const doneCount = tasks.filter(t => (t.completedBy || []).includes(interaction.user.id)).length;
 
-        const lines = tasks.map(t => {
-          const isDone = (t.completedBy || []).includes(user.login);
-          const desc = t.description ? `\n> *${t.description}*` : '';
-          return `${isDone ? '✅' : '🔲'} **${t.title}**${desc}`;
+        const lines = tasks.map((t, i) => {
+          const isDone = (t.completedBy || []).includes(interaction.user.id);
+          const target = t.assignedTo !== 'all' ? ' *(личное)*' : '';
+          const desc = t.description ? `\n> ${t.description}` : '';
+          return `${isDone ? '✅' : '🔲'} **${t.title}**${target}${desc}`;
         });
 
         const embed = new EmbedBuilder()
-          .setTitle(`📋 Задания — ${user.login}`)
+          .setTitle(`📋 Задания — ${recruiter.displayName}`)
           .setDescription(lines.join('\n\n'))
+          .setColor(isDone => 0x60a5fa)
           .setColor(0x60a5fa)
-          .setFooter({ text: `Выполнено: ${doneCount} / ${tasks.length} · Отмечай выполненные на сайте` })
+          .addFields({ name: 'Прогресс', value: `${doneCount} / ${tasks.length} выполнено`, inline: true })
           .setTimestamp();
 
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        // Кнопки для отметки выполнения (первые 5 невыполненных)
+        const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+        const undoneTasks = tasks.filter(t => !(t.completedBy || []).includes(interaction.user.id)).slice(0, 5);
+        const rows = [];
+
+        if (undoneTasks.length) {
+          const row = new ActionRowBuilder().addComponents(
+            undoneTasks.map(t =>
+              new ButtonBuilder()
+                .setCustomId(`complete_task:${t.id}:${interaction.user.id}`)
+                .setLabel(`✔ ${t.title.slice(0, 30)}`)
+                .setStyle(ButtonStyle.Secondary)
+            )
+          );
+          rows.push(row);
+        }
+
+        // Кнопка снять отметку для выполненных
+        const doneTasks = tasks.filter(t => (t.completedBy || []).includes(interaction.user.id)).slice(0, 5);
+        if (doneTasks.length) {
+          const row2 = new ActionRowBuilder().addComponents(
+            doneTasks.map(t =>
+              new ButtonBuilder()
+                .setCustomId(`uncomplete_task:${t.id}:${interaction.user.id}`)
+                .setLabel(`↩ ${t.title.slice(0, 28)}`)
+                .setStyle(ButtonStyle.Danger)
+            )
+          );
+          rows.push(row2);
+        }
+
+        return interaction.editReply({ embeds: [embed], components: rows });
       }
 
       case 'привязать': {

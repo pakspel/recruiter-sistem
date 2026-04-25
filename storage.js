@@ -302,20 +302,24 @@ function createTask(title, description, assignedTo) {
 function getAllTasks() {
   return db.prepare('SELECT * FROM tasks ORDER BY created_at DESC').all().map(rowToTask);
 }
-function getTasksForUser(login) {
-  return db.prepare("SELECT * FROM tasks WHERE assigned_to='all' OR assigned_to=? ORDER BY created_at DESC").all(login).map(rowToTask);
+function getTasksForUser(discordId) {
+  return db.prepare("SELECT * FROM tasks WHERE assigned_to='all' OR assigned_to=? ORDER BY created_at DESC").all(discordId).map(rowToTask);
 }
-function completeTask(taskId, login) {
+function completeTask(taskId, discordId) {
   const row = db.prepare('SELECT * FROM tasks WHERE task_id=?').get(taskId);
   if (!row) return null;
   const completedBy = JSON.parse(row.completed_by || '[]');
-  if (!completedBy.includes(login)) { completedBy.push(login); db.prepare('UPDATE tasks SET completed_by=? WHERE task_id=?').run(JSON.stringify(completedBy), taskId); }
+  if (!completedBy.includes(discordId)) {
+    completedBy.push(discordId);
+    db.prepare('UPDATE tasks SET completed_by=? WHERE task_id=?').run(JSON.stringify(completedBy), taskId);
+  }
   return rowToTask({ ...row, completed_by: JSON.stringify(completedBy) });
 }
-function uncompleteTask(taskId, login) {
+
+function uncompleteTask(taskId, discordId) {
   const row = db.prepare('SELECT * FROM tasks WHERE task_id=?').get(taskId);
   if (!row) return null;
-  const completedBy = JSON.parse(row.completed_by || '[]').filter(l => l !== login);
+  const completedBy = JSON.parse(row.completed_by || '[]').filter(id => id !== discordId);
   db.prepare('UPDATE tasks SET completed_by=? WHERE task_id=?').run(JSON.stringify(completedBy), taskId);
   return rowToTask({ ...row, completed_by: JSON.stringify(completedBy) });
 }

@@ -111,17 +111,22 @@ app.delete('/api/admin/tasks/:id', requireAdmin, (req, res) => {
 // ── Recruiter: tasks ──────────────────────────────────────
 
 app.get('/api/tasks', requireRecruiter, (req, res) => {
-  res.json(storage.getTasksForUser(req.session.login));
+  const discordId = storage.getDiscordIdByLogin(req.session.login);
+  res.json(storage.getTasksForUser(discordId || req.session.login));
 });
 
 app.post('/api/tasks/:id/complete', requireRecruiter, (req, res) => {
-  const task = storage.completeTask(req.params.id, req.session.login);
+  const discordId = storage.getDiscordIdByLogin(req.session.login);
+  if (!discordId) return res.status(400).json({ error: 'Привяжи Discord в кабинете' });
+  const task = storage.completeTask(req.params.id, discordId);
   if (!task) return res.status(404).json({ error: 'Задание не найдено' });
   res.json(task);
 });
 
 app.post('/api/tasks/:id/uncomplete', requireRecruiter, (req, res) => {
-  const task = storage.uncompleteTask(req.params.id, req.session.login);
+  const discordId = storage.getDiscordIdByLogin(req.session.login);
+  if (!discordId) return res.status(400).json({ error: 'Привяжи Discord в кабинете' });
+  const task = storage.uncompleteTask(req.params.id, discordId);
   if (!task) return res.status(404).json({ error: 'Задание не найдено' });
   res.json(task);
 });
