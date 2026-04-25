@@ -267,6 +267,32 @@
       </div>
     </div>
 
+    <!-- Discord привязка -->
+    <div class="section-header" style="margin-top:28px">
+      <div class="section-title">🔗 ПРИВЯЗКА DISCORD</div>
+    </div>
+    <div id="discordLinkBlock" style="background:var(--card);border:1px solid var(--border);padding:20px 22px;margin-bottom:24px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))">
+      <div id="discordLinked" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:4px">ПРИВЯЗАННЫЙ DISCORD ID</div>
+            <div style="font-family:'IBM Plex Mono';font-size:14px;color:var(--green)" id="discordIdDisplay">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:6px">✅ Команды <b>/задания</b> и <b>/привязать</b> в Discord работают</div>
+          </div>
+          <button class="btn-ghost" style="color:var(--red);border-color:rgba(230,57,70,.3);font-size:12px;padding:7px 16px" onclick="unlinkDiscord()">ОТВЯЗАТЬ</button>
+        </div>
+      </div>
+      <div id="discordUnlinked">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Привяжи свой Discord, чтобы просматривать задания прямо в Discord командой <b>/задания</b>.<br>Свой Discord ID можно узнать через <b>/привязать</b> в Discord или в настройках Discord → «Расширенные» → «Режим разработчика».</div>
+        <div class="form-group">
+          <label class="form-label">Твой Discord ID <span style="color:var(--muted);font-size:10px">(17–19 цифр)</span></label>
+          <input class="form-input" id="discordIdInput" placeholder="123456789012345678" maxlength="20">
+        </div>
+        <div class="modal-msg" id="discordLinkMsg"></div>
+        <button class="btn-primary" onclick="linkDiscord()">🔗 ПРИВЯЗАТЬ</button>
+      </div>
+    </div>
+
     <!-- Tasks section -->
     <div class="section-header">
       <div class="section-title">МОИ ЗАДАНИЯ</div>
@@ -329,7 +355,54 @@ async function init() {
   document.getElementById('profileLogin').textContent = authUser.login.toUpperCase();
 
   loadTasks();
+  loadDiscordStatus();
 }
+
+// ── Discord привязка ──────────────────────────────────────
+
+async function loadDiscordStatus() {
+  try {
+    const r = await fetch('/api/auth/discord-status', {headers:{'x-token':authToken}});
+    const d = await r.json();
+    if (d.linked && d.discordId) {
+      document.getElementById('discordLinked').style.display = 'block';
+      document.getElementById('discordUnlinked').style.display = 'none';
+      document.getElementById('discordIdDisplay').textContent = d.discordId;
+    } else {
+      document.getElementById('discordLinked').style.display = 'none';
+      document.getElementById('discordUnlinked').style.display = 'block';
+    }
+  } catch { /* тихо */ }
+}
+
+async function linkDiscord() {
+  const discordId = document.getElementById('discordIdInput').value.trim();
+  const msgEl = document.getElementById('discordLinkMsg');
+  msgEl.className = 'modal-msg'; msgEl.textContent = '';
+  if (!discordId) { msgEl.className='modal-msg error'; msgEl.textContent='ВВЕДИ DISCORD ID'; return; }
+  try {
+    const r = await fetch('/api/auth/link-discord', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','x-token':authToken},
+      body: JSON.stringify({ discordId })
+    });
+    const d = await r.json();
+    if (!r.ok || d.error) { msgEl.className='modal-msg error'; msgEl.textContent=(d.error||'ОШИБКА').toUpperCase(); return; }
+    showToast('✅ Discord привязан!', 'green');
+    loadDiscordStatus();
+  } catch { msgEl.className='modal-msg error'; msgEl.textContent='ОШИБКА СОЕДИНЕНИЯ'; }
+}
+
+async function unlinkDiscord() {
+  if (!confirm('Отвязать Discord от аккаунта?')) return;
+  try {
+    await fetch('/api/auth/unlink-discord', {method:'POST',headers:{'x-token':authToken}});
+    showToast('Discord отвязан', 'green');
+    loadDiscordStatus();
+  } catch { showToast('Ошибка', 'red'); }
+}
+
+
 
 function showAuthWall() {
   document.getElementById('authWall').style.display = 'block';

@@ -494,6 +494,7 @@
       <button class="modal-tab purple-tab active" onclick="switchAdminTab('pending')">
         ЗАЯВКИ<span class="pending-badge" id="pendingBadge2" style="display:none">0</span>
       </button>
+      <button class="modal-tab purple-tab" onclick="switchAdminTab('recruiters')">РЕКРУТЫ</button>
       <button class="modal-tab purple-tab" onclick="switchAdminTab('tasks')">ЗАДАНИЯ</button>
     </div>
 
@@ -505,6 +506,46 @@
         <div class="empty-state">Загрузка...</div>
       </div>
       <button class="btn-ghost" style="margin-top:16px" onclick="loadPending()">↻ ОБНОВИТЬ</button>
+    </div>
+
+    <!-- Recruiters tab -->
+    <div class="modal-form" id="adminRecruitersForm">
+      <div class="modal-msg" id="recruitersAdminMsg"></div>
+
+      <!-- Добавить рекрута по Discord ID -->
+      <div class="admin-section-title">ДОБАВИТЬ РЕКРУТА ПО DISCORD ID</div>
+      <div class="form-group">
+        <label class="form-label">Discord ID <span style="color:var(--muted);font-size:10px">(17–19 цифр)</span></label>
+        <input class="form-input" id="newRecDiscordId" placeholder="123456789012345678" maxlength="20">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Отображаемое имя</label>
+        <input class="form-input" id="newRecName" placeholder="Имя рекрута">
+      </div>
+      <button class="btn-primary purple" onclick="adminAddRecruiter()">+ ДОБАВИТЬ</button>
+
+      <!-- Список рекрутов -->
+      <div class="admin-section-title" style="margin-top:18px">СПИСОК РЕКРУТОВ
+        <span style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);margin-left:8px" id="recListCount"></span>
+      </div>
+      <div class="form-group">
+        <input class="form-input" id="recSearch" placeholder="Поиск по имени..." oninput="filterRecruitersList()">
+      </div>
+      <div id="adminRecruitersList"><div class="empty-state">Загрузка...</div></div>
+    </div>
+
+    <!-- Rename modal inside admin panel -->
+    <div id="renameInline" style="display:none;margin-top:12px;padding:14px;background:var(--surface);border:1px solid var(--border)">
+      <div class="modal-msg" id="renameMsg"></div>
+      <div class="admin-section-title" id="renameTarget">ПЕРЕИМЕНОВАТЬ</div>
+      <div class="form-group">
+        <label class="form-label">Новое имя</label>
+        <input class="form-input" id="renameInput" placeholder="Новое имя рекрута">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-primary purple" onclick="doRename()">СОХРАНИТЬ</button>
+        <button class="btn-ghost" onclick="closeRename()">ОТМЕНА</button>
+      </div>
     </div>
 
     <!-- Tasks tab -->
@@ -838,7 +879,101 @@ async function doEditPoints() {
   fetchData();
 }
 
-// ── Admin panel ───────────────────────────────────────────
+// ── Admin: управление рекрутами ───────────────────────────
+
+let adminRecList = [];
+let renameTargetId = null;
+
+async function loadAdminRecruitersList() {
+  document.getElementById('adminRecruitersList').innerHTML = '<div class="empty-state">Загрузка...</div>';
+  try {
+    const r = await fetch('/api/admin/recruiters-list', { headers: {'x-token': authToken} });
+    adminRecList = await r.json();
+    document.getElementById('recListCount').textContent = adminRecList.length + ' чел.';
+    renderAdminRecruitersList();
+  } catch {
+    document.getElementById('adminRecruitersList').innerHTML = '<div class="empty-state">⚠ Ошибка загрузки</div>';
+  }
+}
+
+function filterRecruitersList() {
+  renderAdminRecruitersList();
+}
+
+function renderAdminRecruitersList() {
+  const q = (document.getElementById('recSearch')?.value || '').toLowerCase();
+  const filtered = q ? adminRecList.filter(r => (r.displayName||'').toLowerCase().includes(q) || r.discordId.includes(q)) : adminRecList;
+  if (!filtered.length) {
+    document.getElementById('adminRecruitersList').innerHTML = '<div class="empty-state">Рекруты не найдены</div>';
+    return;
+  }
+  const statusColors = { active:'var(--green)', warning:'var(--gold)', danger:'var(--red)', curator:'var(--purple)', kicked:'var(--muted)' };
+  const html = filtered.map(r => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap">
+      <div>
+        <span style="font-weight:700;font-size:15px;color:var(--white)">${esc(r.displayName)}</span>
+        <span style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);margin-left:8px">${r.discordId}</span>
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statusColors[r.status]||'var(--muted)'};margin-left:8px"></span>
+        <span style="font-size:12px;color:var(--muted)">💎 ${r.points}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-ghost" style="padding:5px 12px;font-size:11px" onclick="openRename('${r.discordId}','${esc(r.displayName)}')">✏ ИМЯЯ</button>
+        <button class="btn-ghost" style="padding:5px 12px;font-size:11px;color:var(--red)" onclick="openEdit('${r.discordId}','${esc(r.displayName)}')">💎 БАЛЛЫ</button>
+      </div>
+    </div>`).join('');
+  document.getElementById('adminRecruitersList').innerHTML = html;
+}
+
+async function adminAddRecruiter() {
+  const discordId = document.getElementById('newRecDiscordId').value.trim();
+  const name = document.getElementById('newRecName').value.trim();
+  showMsg('recruitersAdminMsg', '', '');
+  if (!discordId) return showMsg('recruitersAdminMsg', 'ВВЕДИ DISCORD ID', 'error');
+  const r = await fetch('/api/admin/recruiters/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-token': authToken },
+    body: JSON.stringify({ discordId, displayName: name })
+  });
+  const d = await r.json();
+  if (!r.ok || d.error) return showMsg('recruitersAdminMsg', d.error?.toUpperCase() || 'ОШИБКА', 'error');
+  document.getElementById('newRecDiscordId').value = '';
+  document.getElementById('newRecName').value = '';
+  showMsg('recruitersAdminMsg', `✓ РЕКРУТ ${(d.recruiter?.displayName||'').toUpperCase()} ДОБАВЛЕН`, 'success');
+  loadAdminRecruitersList();
+  fetchData();
+}
+
+function openRename(discordId, currentName) {
+  renameTargetId = discordId;
+  document.getElementById('renameTarget').textContent = 'ПЕРЕИМЕНОВАТЬ: ' + currentName.toUpperCase();
+  document.getElementById('renameInput').value = currentName;
+  document.getElementById('renameMsg').className = 'modal-msg';
+  document.getElementById('renameInline').style.display = 'block';
+  document.getElementById('renameInput').focus();
+}
+
+function closeRename() {
+  document.getElementById('renameInline').style.display = 'none';
+  renameTargetId = null;
+}
+
+async function doRename() {
+  if (!renameTargetId) return;
+  const name = document.getElementById('renameInput').value.trim();
+  if (!name) return showMsg('renameMsg', 'ВВЕДИ ИМЯ', 'error');
+  const r = await fetch(`/api/admin/recruiters/${renameTargetId}/rename`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-token': authToken },
+    body: JSON.stringify({ name })
+  });
+  const d = await r.json();
+  if (!r.ok || d.error) return showMsg('renameMsg', d.error?.toUpperCase() || 'ОШИБКА', 'error');
+  closeRename();
+  loadAdminRecruitersList();
+  fetchData();
+}
+
+
 
 let adminTabActive = 'pending';
 
@@ -851,12 +986,14 @@ function openAdminPanel() {
 function switchAdminTab(tab) {
   adminTabActive = tab;
   document.querySelectorAll('#adminOverlay .modal-tab').forEach((t, i) => {
-    t.classList.toggle('active', (tab==='pending'&&i===0)||(tab==='tasks'&&i===1));
+    t.classList.toggle('active', (tab==='pending'&&i===0)||(tab==='recruiters'&&i===1)||(tab==='tasks'&&i===2));
   });
   document.getElementById('adminPendingForm').classList.toggle('active', tab==='pending');
+  document.getElementById('adminRecruitersForm').classList.toggle('active', tab==='recruiters');
   document.getElementById('adminTasksForm').classList.toggle('active', tab==='tasks');
   if (tab === 'tasks') { loadAdminTasks(); loadRecruitersForSelect(); }
   if (tab === 'pending') loadPending();
+  if (tab === 'recruiters') loadAdminRecruitersList();
 }
 
 async function loadPendingCount() {
