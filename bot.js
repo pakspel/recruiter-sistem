@@ -71,7 +71,17 @@ const commands = [
       s.setName('id_бота').setDescription('ID другого бота')
         .addStringOption(o => o.setName('id').setDescription('Bot User ID').setRequired(true)))
     .addSubcommand(s =>
-      s.setName('показать').setDescription('Показать текущие настройки'))
+      s.setName('показать').setDescription('Показать текущие настройки')),
+
+  // ── Новые команды ──────────────────
+  new SlashCommandBuilder()
+    .setName('задания')
+    .setDescription('Показать мои задания (нужна привязка Discord в кабинете на сайте)'),
+
+  new SlashCommandBuilder()
+    .setName('привязать')
+    .setDescription('Как привязать свой Discord к аккаунту на сайте'),
+
 ].map(c => c.toJSON());
 
 // ─────────────────────────────────────
@@ -325,6 +335,80 @@ client.on('interactionCreate', async (interaction) => {
         }
         break;
       }
+
+      // ── Новые команды ──────────────────
+
+      case 'задания': {
+        // Ищем аккаунт, привязанный к этому Discord ID
+        const user = storage.getUserByDiscordId(interaction.user.id);
+        if (!user) {
+          const siteUrl = process.env.SITE_URL || 'сайт';
+          return interaction.reply({
+            content: [
+              '❌ **Твой Discord не привязан к аккаунту.**',
+              '',
+              `1. Зайди на **${siteUrl}/cabinet.html**`,
+              '2. Войди в аккаунт',
+              `3. В разделе **🔗 Привязка Discord** введи свой ID: \`${interaction.user.id}\``,
+              '',
+              'После привязки команда /задания будет работать!'
+            ].join('\n'),
+            ephemeral: true
+          });
+        }
+
+        const tasks = storage.getTasksForUser(user.login);
+
+        if (!tasks.length) {
+          return interaction.reply({
+            content: `📋 **${user.login}** — заданий пока нет.`,
+            ephemeral: true
+          });
+        }
+
+        const doneCount = tasks.filter(t => (t.completedBy || []).includes(user.login)).length;
+
+        const lines = tasks.map(t => {
+          const isDone = (t.completedBy || []).includes(user.login);
+          const desc = t.description ? `\n> *${t.description}*` : '';
+          return `${isDone ? '✅' : '🔲'} **${t.title}**${desc}`;
+        });
+
+        const embed = new EmbedBuilder()
+          .setTitle(`📋 Задания — ${user.login}`)
+          .setDescription(lines.join('\n\n'))
+          .setColor(0x60a5fa)
+          .setFooter({ text: `Выполнено: ${doneCount} / ${tasks.length} · Отмечай выполненные на сайте` })
+          .setTimestamp();
+
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+      case 'привязать': {
+        const siteUrl = process.env.SITE_URL || 'твой-сайт.railway.app';
+        // Проверяем, не привязан ли уже
+        const existing = storage.getUserByDiscordId(interaction.user.id);
+        if (existing) {
+          return interaction.reply({
+            content: `✅ Твой Discord уже привязан к аккаунту **${existing.login}**.\nИспользуй /задания чтобы посмотреть задания.`,
+            ephemeral: true
+          });
+        }
+        return interaction.reply({
+          content: [
+            '🔗 **Привязка Discord к аккаунту на сайте**',
+            '',
+            `1. Зайди на **${siteUrl}/cabinet.html**`,
+            '2. Войди в свой аккаунт',
+            '3. Найди раздел **🔗 Привязка Discord**',
+            `4. Введи свой Discord ID: \`${interaction.user.id}\` и нажми **Привязать**`,
+            '',
+            '✨ После этого команда **/задания** покажет твои задания прямо в Discord!'
+          ].join('\n'),
+          ephemeral: true
+        });
+      }
+
     }
   } catch (err) {
     console.error(`Error handling /${interaction.commandName}:`, err);

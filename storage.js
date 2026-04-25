@@ -309,6 +309,64 @@ function deleteTask(taskId) {
   return db.prepare('DELETE FROM tasks WHERE task_id=?').run(taskId).changes > 0;
 }
 
+// ── Discord linking ───────────────────────────────────────
+
+// Добавляем колонку discord_id если её ещё нет (миграция)
+try {
+  db.exec("ALTER TABLE users ADD COLUMN discord_id TEXT DEFAULT NULL");
+} catch (_) { /* уже существует */ }
+
+/** Привязать Discord ID к аккаунту пользователя */
+function linkDiscordToUser(login, discordId) {
+  // Проверяем — не привязан ли этот Discord к другому аккаунту
+  const existing = db.prepare("SELECT original_login FROM users WHERE discord_id=? AND login!=?").get(discordId, login.toLowerCase());
+  if (existing) return { ok: false, error: `Discord уже привязан к аккаунту ${existing.original_login}` };
+  db.prepare("UPDATE users SET discord_id=? WHERE login=?").run(discordId, login.toLowerCase());
+  return { ok: true };
+}
+
+/** Отвязать Discord от аккаунта */
+function unlinkDiscord(login) {
+  db.prepare("UPDATE users SET discord_id=NULL WHERE login=?").run(login.toLowerCase());
+  return { ok: true };
+}
+
+/** Получить логин пользователя по Discord ID */
+function getUserByDiscordId(discordId) {
+  return db.prepare("SELECT original_login as login, role, discord_id FROM users WHERE discord_id=? AND approved=1").get(discordId) || null;
+}
+
+/** Получить Discord ID пользователя по логину */
+function getDiscordIdByLogin(login) {
+  const row = db.prepare("SELECT discord_id FROM users WHERE login=?").get(login.toLowerCase());
+  return row ? row.discord_id : null;
+}
+
+// ── Управление рекрутами (admin) ──────────────────────────
+
+/** Добавить рекрута по Discord ID вручную (без регистрации) */
+function adminAddRecruiter(discordId, displayName, adminLogin) {
+  if (!discordId || !/^\d{15,20}$/.test(discordId))
+    return { ok: false, error: 'Некорректный Discord ID (17–19 цифр)' };
+  if (db.prepare('SELECT 1 FROM recruiters WHERE user_id=?').get(discordId))
+    return { ok: false, error: 'Рекрут с таким Discord ID уже существует' };
+  const name = (displayName || '').trim() || `user_${discordId.slice(-4)}`;
+  const config = getConfig();
+  db.prepare(`INSERT INTO recruiters (user_id,username,display_name,points,total_earned,weekly_activity,joined_at,status,history,prev_earned)
+    VALUES (?,?,?,?,0,'[]',?,'active','[]',0)`)
+    .run(discordId, name, name, config.startingBuffer, new Date().toISOString());
+  return { ok: true, recruiter: get(discordId) };
+}
+
+/** Переименовать рекрута */
+function renameRecruiter(discordId, newName) {
+  if (!newName || !newName.trim()) return { ok: false, error: 'Введи имя' };
+  const trimmed = newName.trim().slice(0, 40);
+  const changes = db.prepare("UPDATE recruiters SET display_name=? WHERE user_id=?").run(trimmed, discordId).changes;
+  if (!changes) return { ok: false, error: 'Рекрут не найден' };
+  return { ok: true, recruiter: get(discordId) };
+}
+
 // ── Compat shim ───────────────────────────────────────────
 
 function load() {
@@ -323,5 +381,7 @@ module.exports = {
   approveUser, approveUserWithRole, rejectUser,
   getPendingUsers, getRecruiters, changePassword, hashPassword,
   createTask, getAllTasks, getTasksForUser, completeTask, uncompleteTask, deleteTask,
-  getAllUsersForAdmin, setUserRole
+  getAllUsersForAdmin, setUserRole,
+  linkDiscordToUser, unlinkDiscord, getUserByDiscordId, getDiscordIdByLogin,
+  adminAddRecruiter, renameRecruiter
 };

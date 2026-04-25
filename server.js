@@ -188,7 +188,61 @@ app.post('/api/superadmin/users/:login/role', requireSuperAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Config / misc via API key ─────────────────────────────
+// ── Admin: управление рекрутами ───────────────────────────
+
+/** Список всех рекрутов в системе рейтинга */
+app.get('/api/admin/recruiters-list', requireAdmin, (req, res) => {
+  const config = storage.getConfig();
+  const list = Object.values(storage.getAll())
+    .map(r => ({ discordId: r.discordId, displayName: r.displayName, username: r.username, points: r.points, status: r.status, joinedAt: r.joinedAt }))
+    .sort((a, b) => b.points - a.points);
+  res.json(list);
+});
+
+/** Добавить рекрута по Discord ID */
+app.post('/api/admin/recruiters/add', requireAdmin, (req, res) => {
+  const { discordId, displayName } = req.body;
+  if (!discordId) return res.status(400).json({ error: 'Укажи Discord ID' });
+  res.json(storage.adminAddRecruiter(discordId.trim(), displayName, req.session.login));
+});
+
+/** Переименовать рекрута */
+app.post('/api/admin/recruiters/:id/rename', requireAdmin, (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Укажи новое имя' });
+  res.json(storage.renameRecruiter(req.params.id, name));
+});
+
+// ── Discord привязка ──────────────────────────────────────
+
+/** Привязать Discord ID к своему аккаунту */
+app.post('/api/auth/link-discord', requireToken, (req, res) => {
+  const { discordId } = req.body;
+  if (!discordId || !/^\d{15,20}$/.test(discordId.trim()))
+    return res.status(400).json({ error: 'Некорректный Discord ID. Должен состоять из 17–19 цифр.' });
+  res.json(storage.linkDiscordToUser(req.session.login, discordId.trim()));
+});
+
+/** Отвязать Discord */
+app.post('/api/auth/unlink-discord', requireToken, (req, res) => {
+  res.json(storage.unlinkDiscord(req.session.login));
+});
+
+/** Получить текущий привязанный Discord ID */
+app.get('/api/auth/discord-status', requireToken, (req, res) => {
+  const discordId = storage.getDiscordIdByLogin(req.session.login);
+  res.json({ discordId: discordId || null, linked: !!discordId });
+});
+
+/** Задания по Discord ID — для бота */
+app.get('/api/tasks/by-discord/:discordId', requireApiKey, (req, res) => {
+  const user = storage.getUserByDiscordId(req.params.discordId);
+  if (!user) return res.status(404).json({ error: 'Discord не привязан ни к одному аккаунту' });
+  const tasks = storage.getTasksForUser(user.login);
+  res.json({ login: user.login, tasks });
+});
+
+
 
 app.get('/api/config', (req, res) => res.json(storage.getConfig()));
 app.post('/api/config', requireApiKey, (req, res) => res.json(storage.setConfig(req.body)));
