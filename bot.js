@@ -105,6 +105,19 @@ async function registerCommands() {
 // ─────────────────────────────────────
 //  Helpers
 // ─────────────────────────────────────
+
+/**
+ * Генерирует случайный пароль длиной до 8 символов
+ * из букв (верхний/нижний регистр) и цифр.
+ */
+function generatePassword(length = 8) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let pwd = '';
+  for (let i = 0; i < length; i++)
+    pwd += chars[Math.floor(Math.random() * chars.length)];
+  return pwd;
+}
+
 function statusEmoji(status) {
   return { active: '🟢', warning: '🟡', danger: '🔴', kicked: '💀' }[status] || '⚪';
 }
@@ -275,12 +288,71 @@ client.on('interactionCreate', async (interaction) => {
       case 'добавить_рекрута': {
         if (!hasAdminRole(interaction.member))
           return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
+
         const target = interaction.options.getUser('пользователь');
-        const name = interaction.options.getString('имя') || target.displayName || target.username;
+        const name   = interaction.options.getString('имя') || target.displayName || target.username;
+
         if (storage.get(target.id))
           return interaction.reply({ content: '⚠️ Этот пользователь уже в системе.', ephemeral: true });
+
+        // 1. Регистрируем рекрута в таблице recruiters
         storage.register(target.id, target.username, name);
-        await interaction.reply({ content: `✅ **${name}** добавлен как рекрут! Начальный буфер: **${config.startingBuffer}** баллов.` });
+
+        // 2. Авто-создаём личный кабинет на сайте
+        const login    = target.username;
+        const password = generatePassword(8);
+        const siteUrl  = process.env.SITE_URL || 'твой-сайт.railway.app';
+
+        // Создаём пользователя (если уже есть — не ломаемся)
+        const regResult = storage.registerUser(login, password);
+        if (regResult.ok) {
+          // Авто-одобряем и сразу привязываем Discord ID
+          storage.approveUser(login);
+          storage.linkDiscordToUser(login, target.id);
+        }
+        // Если пользователь уже существует — только привязываем Discord
+        else {
+          storage.linkDiscordToUser(login, target.id);
+        }
+
+        // 3. Отправляем DM рекруту с данными
+        let dmSent = false;
+        try {
+          const dmEmbed = new EmbedBuilder()
+            .setTitle('🎉 Добро пожаловать в систему рекрутов!')
+            .setColor(0x2ecc71)
+            .setDescription(
+              `Тебя добавили в систему рекрутов. Твой личный кабинет уже создан!\n\n` +
+              `🌐 **Сайт:** ${siteUrl}\n\n` +
+              `**Данные для входа:**\n` +
+              `> 🔑 **Логин:** \`${login}\`\n` +
+              `> 🔒 **Пароль:** \`${password}\`\n\n` +
+              `⚠️ Сохрани этот пароль — он больше не будет показан!\n\n` +
+              `После входа на сайт используй команду \`/привязать\` в Discord ` +
+              `чтобы получить доступ к заданиям прямо в боте.`
+            )
+            .setTimestamp();
+
+          await target.send({ embeds: [dmEmbed] });
+          dmSent = true;
+        } catch (_) {
+          // У пользователя закрыты личные сообщения
+        }
+
+        const dmNote = dmSent
+          ? `📨 Логин и пароль отправлены в личные сообщения.`
+          : `⚠️ Не удалось отправить DM — у пользователя закрыты личные сообщения.\n` +
+            `Передай вручную: логин \`${login}\`, пароль \`${password}\``;
+
+        await interaction.reply({
+          content: [
+            `✅ **${name}** добавлен как рекрут!`,
+            `💎 Начальный буфер: **${config.startingBuffer}** баллов.`,
+            `🔐 Личный кабинет на сайте создан автоматически.`,
+            dmNote
+          ].join('\n'),
+          ephemeral: true   // показываем только админу — пароль не светим публично
+        });
         break;
       }
 
@@ -374,9 +446,27 @@ client.on('interactionCreate', async (interaction) => {
           });
         }
 
+        // ── НОВАЯ ПРОВЕРКА: требуем привязку аккаунта к сайту ──
+        const linkedUser = storage.getUserByDiscordId(interaction.user.id);
+        if (!linkedUser) {
+          const siteUrl = process.env.SITE_URL || 'твой-сайт.railway.app';
+          return interaction.editReply({
+            content: [
+              '🔒 **Для просмотра заданий нужно привязать Discord к сайту.**',
+              '',
+              `1. Войди в личный кабинет на **${siteUrl}**`,
+              '   *(данные для входа были отправлены тебе в личные сообщения при добавлении)*',
+              '2. Используй команду **/привязать** — получишь одноразовый код',
+              '3. Введи код в личном кабинете в разделе **🔗 Привязка Discord**',
+              '',
+              '✨ После этого задания будут доступны прямо в боте!'
+            ].join('\n')
+          });
+        }
+        // ────────────────────────────────────────────────────────
         // BUG FIX: personal tasks have assigned_to = login (string), not discordId.
         // Look up the linked account login so personal tasks are found correctly.
-        const linkedUser = storage.getUserByDiscordId(interaction.user.id);
+        // (linkedUser уже определён выше и гарантированно не null)
         const tasks = storage.getTasksForUser(interaction.user.id, linkedUser ? linkedUser.login : null);
 
         if (!tasks.length) {
