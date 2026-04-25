@@ -91,6 +91,25 @@
   .filter-btn.admin-btn:hover, .filter-btn.admin-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; }
   .filter-btn.cabinet-btn { border-color: rgba(96,165,250,.4); color: var(--blue); }
   .filter-btn.cabinet-btn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .filter-btn.history-btn { border-color: rgba(251,191,36,.35); color: #f59e0b; }
+  .filter-btn.history-btn:hover { background: #f59e0b; border-color: #f59e0b; color: #000; }
+  .filter-btn.lk-btn { border-color: rgba(96,165,250,.4); color: var(--blue); }
+  .filter-btn.lk-btn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
+  /* Completed-by block inside task card */
+  .task-completors { margin-top: 6px; display: none; flex-wrap: wrap; gap: 4px; }
+  .task-completors.open { display: flex; }
+  .completor-tag {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.3);
+    color: #2ecc71; border-radius: 4px; padding: 2px 7px;
+  }
+  .task-done-toggle {
+    display: inline-block; cursor: pointer; font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace; color: #2ecc71;
+    border: 1px solid rgba(46,204,113,.35); border-radius: 4px;
+    padding: 1px 6px; margin-left: 4px; user-select: none;
+  }
+  .task-done-toggle:hover { background: rgba(46,204,113,.12); }
 
   /* Pending badge */
   .pending-badge {
@@ -392,6 +411,14 @@
     <button class="filter-btn admin-btn" id="adminPanelBtn" style="display:none" onclick="openAdminPanel()">
       ⚙ АДМИН<span class="pending-badge" id="pendingBadge" style="display:none">0</span>
     </button>
+    <!-- ЛК рекрута — для админов -->
+    <a href="/cabinet.html" class="filter-btn lk-btn" id="adminCabinetBtn" style="display:none;text-decoration:none">
+      👤 ЛК РЕКРУТА
+    </a>
+    <!-- Логи начислений — для админов -->
+    <a href="/history.html" class="filter-btn history-btn" id="adminHistoryBtn" style="display:none;text-decoration:none">
+      📜 ЛОГИ БАЛЛОВ
+    </a>
     <!-- Cabinet link — shown for recruits -->
     <a href="/cabinet.html" class="filter-btn cabinet-btn" id="cabinetBtn" style="display:none;text-decoration:none">
       📋 МОЙ КАБИНЕТ
@@ -758,6 +785,8 @@ function updateAuthUI() {
   const meta = document.getElementById('authMeta');
   const adminBtn = document.getElementById('adminPanelBtn');
   const cabinetBtn = document.getElementById('cabinetBtn');
+  const adminCabinetBtn = document.getElementById('adminCabinetBtn');
+  const adminHistoryBtn = document.getElementById('adminHistoryBtn');
 
   if (authUser) {
     const isAdmin = authUser.role === 'admin';
@@ -773,6 +802,8 @@ function updateAuthUI() {
 
     // Show admin panel button only for admins
     adminBtn.style.display = isAdmin ? '' : 'none';
+    adminCabinetBtn.style.display = isAdmin ? '' : 'none';
+    adminHistoryBtn.style.display = isAdmin ? '' : 'none';
     // Show cabinet button only for recruits
     cabinetBtn.style.display = isRecruiter ? '' : 'none';
 
@@ -783,6 +814,8 @@ function updateAuthUI() {
     meta.style.display = 'none';
     adminBtn.style.display = 'none';
     cabinetBtn.style.display = 'none';
+    adminCabinetBtn.style.display = 'none';
+    adminHistoryBtn.style.display = 'none';
   }
   render();
 }
@@ -1088,23 +1121,43 @@ async function loadAdminTasks() {
       list.innerHTML = '<div class="empty-state">Заданий пока нет</div>';
       return;
     }
-    list.innerHTML = tasks.map(t => `
+
+    // Карта discordId → displayName из уже загруженного лидерборда
+    const nameMap = {};
+    (allData || []).forEach(rec => { nameMap[rec.discordId] = rec.displayName || rec.username || rec.discordId; });
+
+    list.innerHTML = tasks.map(t => {
+      const count = t.completedBy.length;
+      const tags = t.completedBy.map(id =>
+        `<span class="completor-tag" title="${esc(id)}">${esc(nameMap[id] || id)}</span>`
+      ).join('');
+      const tid = 'cp-' + t.id;
+      return `
       <div class="task-item" id="task-${t.id}">
         <div class="task-info">
           <div class="task-title-admin">${esc(t.title)}</div>
           <div class="task-meta">
             ${t.assignedTo === 'all' ? '👥 Все рекруты' : '👤 ' + esc(t.assignedTo)} ·
-            Выполнено: ${t.completedBy.length} ·
+            <span style="color:${count > 0 ? '#2ecc71' : 'var(--muted)'}">Выполнили: ${count}</span>${count > 0 ? ` <span class="task-done-toggle" onclick="toggleCompletors('${tid}')">▾ показать</span>` : ''} ·
             ${new Date(t.createdAt).toLocaleDateString('ru')}
           </div>
-          ${t.description ? `<div class="task-meta" style="margin-top:2px;color:var(--dim)">${esc(t.description)}</div>` : ''}
+          ${count > 0 ? `<div class="task-completors" id="${tid}">${tags}</div>` : ''}
+          ${t.description ? `<div class="task-meta" style="margin-top:4px;color:var(--dim)">${esc(t.description)}</div>` : ''}
         </div>
         <button class="task-del-btn" onclick="deleteTask('${t.id}')" title="Удалить">✕</button>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   } catch {
     list.innerHTML = '<div class="empty-state" style="color:var(--red)">Ошибка загрузки</div>';
   }
+}
+
+function toggleCompletors(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const open = el.classList.toggle('open');
+  const toggle = el.parentElement.querySelector('.task-done-toggle');
+  if (toggle) toggle.textContent = open ? '▴ скрыть' : '▾ показать';
 }
 
 async function loadRecruitersForSelect() {
