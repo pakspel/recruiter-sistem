@@ -259,7 +259,7 @@ async function init() {
     if (!r.ok) { showDenied(); return; }
     const d = await r.json();
     authUser = d;
-    if (d.login !== 'PAKSPEL') { showDenied(); return; }
+    // Доступ проверяется на бэкенде через requireSuperAdmin → вернёт 403 в loadUsers
   } catch { showDenied(); return; }
 
   document.getElementById('accessDenied').style.display = 'none';
@@ -302,7 +302,7 @@ function renderTable() {
   }
 
   const rows = filtered.map(u => {
-    const isSelf = u.login === 'PAKSPEL';
+    const isSelf = u.login === authUser.login;
     const roleLabel = isSelf
       ? '<span class="role-badge superadmin">⚡ СУПЕРАДМИН</span>'
       : u.role === 'admin'
