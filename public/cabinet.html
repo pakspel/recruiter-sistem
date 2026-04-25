@@ -213,6 +213,63 @@
   @keyframes fadeDown { from { opacity:0; transform: translateY(-20px); } to { opacity:1; transform: none; } }
   @keyframes fadeUp   { from { opacity:0; transform: translateY(16px);  } to { opacity:1; transform: none; } }
   @keyframes fadeRow  { from { opacity:0; transform: translateX(-10px); } to { opacity:1; transform: none; } }
+
+  /* ── Discord form ── */
+  .form-group { margin-bottom: 14px; }
+
+  .form-label {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 8px;
+  }
+
+  .form-input {
+    width: 100%; background: var(--surface);
+    border: 1px solid var(--border); color: var(--white);
+    font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+    padding: 11px 14px; outline: none; transition: border-color .2s, box-shadow .2s;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+  .form-input::placeholder { color: var(--muted); }
+  .form-input:focus {
+    border-color: rgba(96,165,250,.6);
+    box-shadow: 0 0 0 3px rgba(96,165,250,.08), inset 0 0 12px rgba(96,165,250,.04);
+  }
+  .form-input:focus::placeholder { color: var(--border); }
+
+  /* ── Ghost button (for unlink etc.) ── */
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent; color: var(--dim);
+    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
+    letter-spacing: 1px; text-transform: uppercase;
+    padding: 8px 16px; border: 1px solid var(--border);
+    cursor: pointer; transition: .2s;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+  .btn-ghost:hover { border-color: var(--red); color: var(--red); background: rgba(230,57,70,.06); }
+
+  /* ── Modal message (inline feedback) ── */
+  .modal-msg {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase;
+    min-height: 18px; margin-bottom: 12px; transition: color .2s;
+  }
+  .modal-msg.error { color: var(--red); }
+  .modal-msg.success { color: var(--green); }
+
+  /* ── Discord linked block ── */
+  .discord-id-display {
+    font-family: 'IBM Plex Mono', monospace; font-size: 15px;
+    color: var(--green); letter-spacing: 1px;
+    background: rgba(46,194,126,.07); border: 1px solid rgba(46,194,126,.2);
+    padding: 10px 14px; margin-top: 6px; display: inline-block;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+
+  /* ── Btn primary: ensure icon + text align ── */
+  .btn-primary { display: inline-flex; align-items: center; gap: 8px; }
 </style>
 </head>
 <body>
@@ -273,20 +330,20 @@
     </div>
     <div id="discordLinkBlock" style="background:var(--card);border:1px solid var(--border);padding:20px 22px;margin-bottom:24px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))">
       <div id="discordLinked" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
           <div>
-            <div style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:4px">ПРИВЯЗАННЫЙ DISCORD ID</div>
-            <div style="font-family:'IBM Plex Mono';font-size:14px;color:var(--green)" id="discordIdDisplay">—</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:6px">✅ Команды <b>/задания</b> и <b>/привязать</b> в Discord работают</div>
+            <div style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">✅ Привязанный Discord ID</div>
+            <div class="discord-id-display" id="discordIdDisplay">—</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:10px">Команды <b style="color:var(--blue)">/задания</b> и <b style="color:var(--blue)">/привязать</b> в Discord работают</div>
           </div>
-          <button class="btn-ghost" style="color:var(--red);border-color:rgba(230,57,70,.3);font-size:12px;padding:7px 16px" onclick="unlinkDiscord()">ОТВЯЗАТЬ</button>
+          <button class="btn-ghost" onclick="unlinkDiscord()">✕ ОТВЯЗАТЬ</button>
         </div>
       </div>
       <div id="discordUnlinked">
-        <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Привяжи свой Discord, чтобы просматривать задания прямо в Discord командой <b>/задания</b>.<br>Свой Discord ID можно узнать через <b>/привязать</b> в Discord или в настройках Discord → «Расширенные» → «Режим разработчика».</div>
+        <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:18px">Привяжи свой Discord, чтобы просматривать задания прямо в Discord командой <b style="color:var(--blue)">/задания</b>.<br>Свой Discord ID можно узнать через <b style="color:var(--blue)">/привязать</b> в Discord или в настройках Discord → «Расширенные» → «Режим разработчика».</div>
         <div class="form-group">
-          <label class="form-label">Твой Discord ID <span style="color:var(--muted);font-size:10px">(17–19 цифр)</span></label>
-          <input class="form-input" id="discordIdInput" placeholder="123456789012345678" maxlength="20">
+          <label class="form-label">Твой Discord ID <span style="color:var(--muted);font-weight:400">(17–19 цифр)</span></label>
+          <input class="form-input" id="discordIdInput" placeholder="123456789012345678" maxlength="20" type="text" inputmode="numeric">
         </div>
         <div class="modal-msg" id="discordLinkMsg"></div>
         <button class="btn-primary" onclick="linkDiscord()">🔗 ПРИВЯЗАТЬ</button>
@@ -321,6 +378,7 @@ let authToken = localStorage.getItem('authToken');
 let authUser  = JSON.parse(localStorage.getItem('authUser') || 'null');
 let allTasks  = [];
 let taskFilter = 'all';
+let currentDiscordId = null; // FIX: completedBy stores discordId, not login
 
 function esc(str) {
   return String(str||'').replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
@@ -365,13 +423,17 @@ async function loadDiscordStatus() {
     const r = await fetch('/api/auth/discord-status', {headers:{'x-token':authToken}});
     const d = await r.json();
     if (d.linked && d.discordId) {
+      currentDiscordId = d.discordId; // FIX: save for completedBy checks
       document.getElementById('discordLinked').style.display = 'block';
       document.getElementById('discordUnlinked').style.display = 'none';
       document.getElementById('discordIdDisplay').textContent = d.discordId;
     } else {
+      currentDiscordId = null;
       document.getElementById('discordLinked').style.display = 'none';
       document.getElementById('discordUnlinked').style.display = 'block';
     }
+    // Re-render tasks now that we know discordId
+    if (allTasks.length) { updateStats(); renderTasks(); }
   } catch { /* тихо */ }
 }
 
@@ -424,7 +486,7 @@ async function loadTasks() {
 
 function updateStats() {
   const total = allTasks.length;
-  const done = allTasks.filter(t => t.completedBy.includes(authUser.login)).length;
+  const done = allTasks.filter(t => currentDiscordId && t.completedBy.includes(currentDiscordId)).length;
   const pending = total - done;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
@@ -443,8 +505,8 @@ function setTaskFilter(f, btn) {
 }
 
 function getFilteredTasks() {
-  if (taskFilter === 'done') return allTasks.filter(t => t.completedBy.includes(authUser.login));
-  if (taskFilter === 'pending') return allTasks.filter(t => !t.completedBy.includes(authUser.login));
+  if (taskFilter === 'done') return allTasks.filter(t => currentDiscordId && t.completedBy.includes(currentDiscordId));
+  if (taskFilter === 'pending') return allTasks.filter(t => !currentDiscordId || !t.completedBy.includes(currentDiscordId));
   return allTasks;
 }
 
@@ -465,7 +527,7 @@ function renderTasks() {
   }
 
   container.innerHTML = tasks.map((t, idx) => {
-    const isDone = t.completedBy.includes(authUser.login);
+    const isDone = currentDiscordId && t.completedBy.includes(currentDiscordId);
     const isPersonal = t.assignedTo !== 'all';
     const date = new Date(t.createdAt).toLocaleDateString('ru', {day:'numeric', month:'short'});
     return `
@@ -494,7 +556,11 @@ async function toggleTask(id, isDone) {
     const r = await fetch(`/api/tasks/${id}/${endpoint}`, {
       method: 'POST', headers: {'x-token': authToken}
     });
-    if (!r.ok) return;
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      showToast('⚠ ' + (err.error || 'Ошибка'), 'blue');
+      return;
+    }
     const updated = await r.json();
 
     // Update local data
