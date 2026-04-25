@@ -65,6 +65,54 @@
   }
   .nav-link:hover { border-color: var(--blue); color: var(--blue); }
 
+  /* ── Admin nav bar ── */
+  .admin-nav {
+    display: none;
+    background: rgba(167,139,250,0.06);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .admin-nav.visible { display: flex; }
+  .admin-nav-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: rgba(167,139,250,0.7);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+  .admin-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid rgba(167,139,250,0.3);
+    color: rgba(167,139,250,0.9);
+    background: rgba(167,139,250,0.08);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .admin-nav-link:hover { background: rgba(167,139,250,0.18); border-color: rgba(167,139,250,0.6); color: #c4b5fd; }
+  .admin-nav-link.superadmin-btn {
+    border-color: rgba(233,196,106,0.35);
+    color: rgba(233,196,106,0.9);
+    background: rgba(233,196,106,0.07);
+  }
+  .admin-nav-link.superadmin-btn:hover { background: rgba(233,196,106,0.15); border-color: rgba(233,196,106,0.6); color: #e9c46a; }
+  .admin-nav-sep { width: 1px; height: 20px; background: rgba(167,139,250,0.2); margin: 0 4px; }
+
   /* ── Auth wall ── */
   .auth-wall {
     text-align: center; padding: 100px 20px;
@@ -286,7 +334,15 @@
     <a href="/" class="nav-link">← РЕЙТИНГ</a>
   </header>
 
-  <!-- Auth wall -->
+  <!-- Admin navigation bar (visible only for admin/superadmin) -->
+  <nav class="admin-nav" id="adminNav">
+    <span class="admin-nav-label">⚙ АДМИН</span>
+    <a href="/index.html#admin" class="admin-nav-link" onclick="openAdminOnIndex(event)">📋 Задания рекрутов</a>
+    <a href="/history.html" class="admin-nav-link">📊 Логи / История</a>
+    <a href="/index2.html" class="admin-nav-link">🏆 Рейтинг</a>
+    <div class="admin-nav-sep"></div>
+    <a href="/superadmin.html" class="admin-nav-link superadmin-btn" id="superadminNavBtn" style="display:none">⚡ Супер-Админ</a>
+  </nav>
   <div class="auth-wall" id="authWall">
     <div class="icon">🔒</div>
     <h2>ДОСТУП ЗАКРЫТ</h2>
@@ -427,6 +483,14 @@ async function init() {
   // Show cabinet
   document.getElementById('authWall').style.display = 'none';
   document.getElementById('cabinetContent').style.display = 'block';
+
+  // Show admin nav for admins
+  if (d.role === 'admin' || d.role === 'superadmin') {
+    document.getElementById('adminNav').classList.add('visible');
+    if (d.login === 'PAKSPEL' || d.role === 'superadmin') {
+      document.getElementById('superadminNavBtn').style.display = '';
+    }
+  }
 
   // Set profile
   const initials = authUser.login.slice(0, 2).toUpperCase();
@@ -625,6 +689,11 @@ async function toggleTask(id, isDone) {
   } catch {
     showToast('Ошибка соединения', 'blue');
   }
+}
+
+function openAdminOnIndex(e) {
+  // Store intent so index.html can auto-open the admin panel
+  sessionStorage.setItem('openAdminPanel', '1');
 }
 
 init();

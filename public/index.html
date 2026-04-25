@@ -777,6 +777,12 @@ function updateAuthUI() {
     cabinetBtn.style.display = isRecruiter ? '' : 'none';
 
     if (isAdmin) loadPendingCount();
+
+    // Auto-open admin panel if redirected from cabinet.html
+    if (isAdmin && sessionStorage.getItem('openAdminPanel') === '1') {
+      sessionStorage.removeItem('openAdminPanel');
+      setTimeout(() => { openAdminPanel(); switchAdminTab('tasks'); }, 400);
+    }
   } else {
     icon.classList.remove('logged-in', 'is-admin');
     icon.title = 'Авторизация';
