@@ -1,7 +1,8 @@
 const {
   Client, GatewayIntentBits, REST, Routes,
   SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits,
-  ActionRowBuilder, ButtonBuilder, ButtonStyle
+  ActionRowBuilder, ButtonBuilder, ButtonStyle,
+  ModalBuilder, TextInputBuilder, TextInputStyle
 } = require('discord.js');
 const storage = require('./storage');
 
@@ -71,6 +72,16 @@ const commands = [
     .addSubcommand(s =>
       s.setName('id_бота').setDescription('ID другого бота')
         .addStringOption(o => o.setName('id').setDescription('Bot User ID').setRequired(true)))
+    .addSubcommand(s =>
+      s.setName('канал_отчётности').setDescription('Канал где рекруты присылают отчёты')
+        .addStringOption(o => o.setName('id').setDescription('Channel ID').setRequired(true)))
+    .addSubcommand(s =>
+      s.setName('канал_проверки').setDescription('Канал куда бот шлёт отчёты на одобрение')
+        .addStringOption(o => o.setName('id').setDescription('Channel ID').setRequired(true)))
+    .addSubcommand(s =>
+      s.setName('баллы_за_отчёт').setDescription('Баллы за кейворд в отчёте')
+        .addStringOption(o => o.setName('кейворд').setDescription('Кейворд (ТП / ВН / 5ВИТО / ...)').setRequired(true))
+        .addIntegerOption(o => o.setName('баллы').setDescription('Сколько баллов начислять').setRequired(true)))
     .addSubcommand(s =>
       s.setName('показать').setDescription('Показать текущие настройки')),
 
@@ -225,8 +236,148 @@ async function parseOtherBotMessage(message) {
 }
 
 // ─────────────────────────────────────
-//  Event handlers
+//  Report channel handler
 // ─────────────────────────────────────
+
+/**
+ * Дефолтные баллы за кейворды.
+ * Хранятся в config.reportKeywords = { "ТП": 5, "ВН": 5, "5ВИТО": 5 }
+ * Специальный кейворд ЗАДАНИЕ — баллы указывает куратор вручную через модал.
+ */
+const DEFAULT_REPORT_KEYWORDS = { 'ТП': 5, 'ВН': 5, '5ВИТО': 5 };
+const ZADANIE_KEYWORD = 'ЗАДАНИЕ'; // баллы задаёт куратор
+
+function getReportKeywords(config) {
+  return { ...DEFAULT_REPORT_KEYWORDS, ...(config.reportKeywords || {}) };
+}
+
+/** Ищет первый совпавший кейворд в тексте (без учёта регистра). */
+function detectKeyword(text, keywords) {
+  // Сначала проверяем ЗАДАНИЕ отдельно
+  if (text.toUpperCase().includes(ZADANIE_KEYWORD)) return { keyword: ZADANIE_KEYWORD, points: null };
+  for (const [kw, pts] of Object.entries(keywords)) {
+    if (text.toUpperCase().includes(kw.toUpperCase())) return { keyword: kw, points: pts };
+  }
+  return null;
+}
+
+/** Проверяет, является ли пользователь куратором или администратором. */
+function isCuratorOrAdmin(member, config) {
+  if (hasAdminRole(member)) return true;
+  const curatorRoleId = config.curatorRoleId || process.env.CURATOR_ROLE_ID;
+  if (curatorRoleId) return member.roles.cache.has(curatorRoleId);
+  // Фолбэк — проверяем по баллам в системе
+  const rec = storage.get(member.id);
+  return rec && rec.points >= 2000;
+}
+
+async function handleReportMessage(message) {
+  const config = storage.getConfig();
+
+  if (!config.reportChannelId || message.channelId !== config.reportChannelId) return;
+  if (message.author.bot) return;
+
+  const text = message.content || '';
+  const hasPhoto = message.attachments.some(a =>
+    a.contentType?.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(a.name || '')
+  );
+  const keywords = getReportKeywords(config);
+  const kwMatch  = detectKeyword(text, keywords);
+
+  // Молчим если не похоже на отчёт (нет ни кейворда, ни фото вместе)
+  if (!kwMatch && !hasPhoto) return;
+
+  // ── Валидация ─────────────────────────────────────────
+  const errors = [];
+  if (!hasPhoto) errors.push('📷 **Нет фото-доказательства** — прикрепи скриншот');
+  if (!kwMatch)  errors.push(`🔑 **Нет кейворда** — укажи: ${[...Object.keys(keywords), ZADANIE_KEYWORD].join(' · ')}`);
+
+  if (errors.length) {
+    const reply = await message.reply({
+      content: ['❌ **Отчёт не принят — исправь и отправь снова:**', ...errors, '',
+        `**Формат:** \`тег КЕЙВОРД\` + скриншот`].join('\n')
+    });
+    setTimeout(() => reply.delete().catch(() => {}), 30_000);
+    return;
+  }
+
+  const recruiter = storage.get(message.author.id);
+  if (!recruiter) return; // не рекрут — тихо игнорируем
+
+  const reviewChannelId = config.reportReviewChannelId || config.reportChannelId;
+  let reviewChannel;
+  try { reviewChannel = await message.client.channels.fetch(reviewChannelId); }
+  catch { console.error('[Reports] Канал проверки не найден:', reviewChannelId); return; }
+
+  const photo = message.attachments.first();
+  const isZadanie = kwMatch.keyword === ZADANIE_KEYWORD;
+
+  if (isZadanie) {
+    // ── ЗАДАНИЕ: баллы выставляет куратор вручную ────────
+    const embed = new EmbedBuilder()
+      .setTitle('📌 Задание выполнено — укажи баллы')
+      .setColor(0x60a5fa)
+      .addFields(
+        { name: '👤 Рекрут',    value: `${recruiter.displayName} (<@${message.author.id}>)`, inline: true },
+        { name: '🔑 Тип',       value: '`ЗАДАНИЕ`', inline: true },
+        { name: '🔗 Сообщение', value: `[Перейти](${message.url})`, inline: true },
+        { name: '💬 Текст',     value: text.slice(0, 500) || '—', inline: false },
+        { name: '📅 Дата',      value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: true }
+      )
+      .setImage(photo?.url ?? null)
+      .setFooter({ text: `ID: ${message.author.id} · msg: ${message.id}` });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`zadanie_award:${message.author.id}:${message.id}`)
+        .setLabel('💎 Выставить баллы')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`report_revoke:${message.author.id}:0:${message.id}`)
+        .setLabel('❌ Отклонить')
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await reviewChannel.send({ embeds: [embed], components: [row] });
+    await message.react('⏳').catch(() => {});
+
+  } else {
+    // ── Обычный кейворд: баллы начисляем сразу ──────────
+    const awarded = storage.addPoints(
+      message.author.id, kwMatch.points,
+      `Отчёт: ${kwMatch.keyword}`, 'bot-report', 'report'
+    );
+
+    // Реакция ✅ на исходное сообщение
+    await message.react('✅').catch(() => {});
+
+    const embed = new EmbedBuilder()
+      .setTitle('✅ Баллы начислены автоматически')
+      .setColor(0x2ecc71)
+      .addFields(
+        { name: '👤 Рекрут',    value: `${recruiter.displayName} (<@${message.author.id}>)`, inline: true },
+        { name: '🔑 Активность',value: `\`${kwMatch.keyword}\``, inline: true },
+        { name: '💎 Начислено', value: `+${kwMatch.points}`, inline: true },
+        { name: '📊 Итого',     value: `${awarded.points} баллов`, inline: true },
+        { name: '🔗 Сообщение', value: `[Перейти](${message.url})`, inline: true },
+        { name: '📅 Дата',      value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: true },
+        { name: '💬 Текст',     value: text.slice(0, 300) || '—', inline: false }
+      )
+      .setImage(photo?.url ?? null)
+      .setFooter({ text: `ID: ${message.author.id} · msg: ${message.id}` });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`report_revoke:${message.author.id}:${kwMatch.points}:${message.id}`)
+        .setLabel(`❌ Скам — снять ${kwMatch.points} баллов`)
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await reviewChannel.send({ embeds: [embed], components: [row] });
+  }
+}
+
+
 client.once('clientReady', async () => {
   console.log(`🤖 Bot logged in as ${client.user.tag}`);
   await registerCommands();
@@ -234,6 +385,15 @@ client.once('clientReady', async () => {
 
 client.on('messageCreate', async (message) => {
   const config = storage.getConfig();
+
+  // ── Отчёты рекрутов ───────────────────────────────────
+  try {
+    await handleReportMessage(message);
+  } catch (err) {
+    console.error('Error handling report message:', err);
+  }
+
+  // ── Другой бот ────────────────────────────────────────
   if (!config.watchChannelId || !config.otherBotId) return;
   if (message.channelId !== config.watchChannelId) return;
   if (message.author.id !== config.otherBotId) return;
@@ -246,26 +406,149 @@ client.on('messageCreate', async (message) => {
 });
 
 client.on('interactionCreate', async (interaction) => {
-  // ── Button handler ────────────────────────────────────────
-  if (interaction.isButton()) {
-    const [action, taskId, targetDiscordId] = interaction.customId.split(':');
 
-    // Only the task owner can press the button
-    if (interaction.user.id !== targetDiscordId) {
-      return interaction.reply({ content: '❌ Это не твоё задание.', ephemeral: true });
+  // ── Modal submit: ЗАДАНИЕ — куратор указал баллы ──────────
+  if (interaction.isModalSubmit() && interaction.customId.startsWith('zadanie_modal:')) {
+    const parts      = interaction.customId.split(':');
+    const recruiterId = parts[1];
+    const origMsgId   = parts[2];
+    const rawPoints   = interaction.fields.getTextInputValue('zadanie_points').trim();
+    const points      = parseInt(rawPoints);
+
+    if (isNaN(points) || points < 1 || points > 500) {
+      return interaction.reply({ content: '❌ Укажи число от 1 до 500.', ephemeral: true });
     }
 
-    if (action === 'complete_task') {
-      storage.completeTask(taskId, interaction.user.id);
-      await interaction.reply({ content: '✅ Задание отмечено как выполненное!', ephemeral: true });
-    } else if (action === 'uncomplete_task') {
-      storage.uncompleteTask(taskId, interaction.user.id);
-      await interaction.reply({ content: '↩ Отметка снята.', ephemeral: true });
+    const recruiter = storage.get(recruiterId);
+    if (!recruiter) return interaction.reply({ content: '❌ Рекрут не найден.', ephemeral: true });
+
+    const updated = storage.addPoints(recruiterId, points, 'Задание (куратор)', interaction.user.id, 'report');
+
+    // Обновляем embed в канале проверки
+    const updatedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+      .setColor(0x2ecc71)
+      .setTitle('✅ Задание засчитано')
+      .addFields(
+        { name: '💎 Начислено',   value: `+${points}`, inline: true },
+        { name: '📊 Итого',       value: `${updated.points} баллов`, inline: true },
+        { name: '👮 Куратор',     value: interaction.user.username, inline: true }
+      );
+    await interaction.update({ embeds: [updatedEmbed], components: [] });
+
+    // Меняем реакцию на ✅ в канале отчётности
+    try {
+      const config = storage.getConfig();
+      const reportCh = await interaction.client.channels.fetch(config.reportChannelId);
+      const origMsg  = await reportCh.messages.fetch(origMsgId);
+      await origMsg.reactions.removeAll();
+      await origMsg.react('✅');
+    } catch {}
+
+    // ЛС рекруту
+    try {
+      const user = await interaction.client.users.fetch(recruiterId);
+      await user.send({ content: `✅ Твоё задание засчитано куратором! +**${points}** баллов. Итого: **${updated.points}**.` });
+    } catch {}
+    return;
+  }
+
+  // ── Button handler ────────────────────────────────────────
+  if (interaction.isButton()) {
+    const parts  = interaction.customId.split(':');
+    const action = parts[0];
+
+    // ── Кнопка: снять баллы (скам) ────────────────────────
+    if (action === 'report_revoke') {
+      if (!hasAdminRole(interaction.member)) {
+        return interaction.reply({ content: '❌ Только администраторы могут отклонять отчёты.', ephemeral: true });
+      }
+      const recruiterId = parts[1];
+      const points      = parseInt(parts[2]) || 0;
+      const origMsgId   = parts[3];
+      const recruiter   = storage.get(recruiterId);
+
+      // Снимаем баллы (если уже были начислены — points > 0)
+      let updated = recruiter;
+      if (points > 0 && recruiter) {
+        updated = storage.addPoints(recruiterId, -points, 'Отчёт отклонён (скам)', interaction.user.id, 'report-revoke');
+      }
+
+      const revokedEmbed = EmbedBuilder.from(interaction.message.embeds[0])
+        .setColor(0xe63946)
+        .setTitle('🚫 Отчёт отклонён — баллы сняты')
+        .addFields(
+          { name: '👮 Администратор', value: interaction.user.username, inline: true },
+          { name: '🔻 Снято',         value: points > 0 ? `-${points}` : '—', inline: true },
+          { name: '📊 Итого',         value: updated ? `${updated.points}` : '—', inline: true }
+        );
+      await interaction.update({ embeds: [revokedEmbed], components: [] });
+
+      // Меняем реакцию на ❌ в канале отчётности
+      try {
+        const config = storage.getConfig();
+        const reportCh = await interaction.client.channels.fetch(config.reportChannelId);
+        const origMsg  = await reportCh.messages.fetch(origMsgId);
+        await origMsg.reactions.removeAll();
+        await origMsg.react('❌');
+      } catch {}
+
+      // ЛС рекруту
+      try {
+        const user = await interaction.client.users.fetch(recruiterId);
+        const txt = points > 0
+          ? `🚫 Твой отчёт был отклонён как скам — снято **${points}** баллов. Обратись к администратору если это ошибка.`
+          : `🚫 Твоё задание было отклонено администратором.`;
+        await user.send({ content: txt });
+      } catch {}
+      return;
+    }
+
+    // ── Кнопка: ЗАДАНИЕ — открываем модал для ввода баллов ─
+    if (action === 'zadanie_award') {
+      const config = storage.getConfig();
+      if (!isCuratorOrAdmin(interaction.member, config)) {
+        return interaction.reply({ content: '❌ Только кураторы и администраторы могут выставлять баллы за задания.', ephemeral: true });
+      }
+      const recruiterId = parts[1];
+      const origMsgId   = parts[2];
+      const recruiter   = storage.get(recruiterId);
+
+      const modal = new ModalBuilder()
+        .setCustomId(`zadanie_modal:${recruiterId}:${origMsgId}`)
+        .setTitle(`Баллы за задание — ${recruiter?.displayName || recruiterId}`);
+
+      const input = new TextInputBuilder()
+        .setCustomId('zadanie_points')
+        .setLabel('Сколько баллов начислить? (1–500)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('Например: 10')
+        .setMinLength(1)
+        .setMaxLength(3)
+        .setRequired(true);
+
+      modal.addComponents(new ActionRowBuilder().addComponents(input));
+      await interaction.showModal(modal);
+      return;
+    }
+
+    // ── Кнопки заданий (задачи рекрутов) ─────────────────
+    const [taskAction, taskId, targetDiscordId] = parts;
+    if (taskAction === 'complete_task' || taskAction === 'uncomplete_task') {
+      if (interaction.user.id !== targetDiscordId) {
+        return interaction.reply({ content: '❌ Это не твоё задание.', ephemeral: true });
+      }
+      if (taskAction === 'complete_task') {
+        storage.completeTask(taskId, interaction.user.id);
+        await interaction.reply({ content: '✅ Задание отмечено как выполненное!', ephemeral: true });
+      } else {
+        storage.uncompleteTask(taskId, interaction.user.id);
+        await interaction.reply({ content: '↩ Отметка снята.', ephemeral: true });
+      }
     }
     return;
   }
 
-  if (!interaction.isChatInputCommand()) return;
+
   const config = storage.getConfig();
 
   try {
@@ -396,6 +679,8 @@ client.on('interactionCreate', async (interaction) => {
       case 'настройки': {
         const sub = interaction.options.getSubcommand();
         if (sub === 'показать') {
+          const keywords = getReportKeywords(config);
+          const kwLines = Object.entries(keywords).map(([k, v]) => `  \`${k}\` → +${v} баллов`).join('\n');
           const lines = [
             `**Еженедельное списание:** ${config.weeklyBurn} баллов`,
             `**Начальный буфер:** ${config.startingBuffer} баллов`,
@@ -403,7 +688,12 @@ client.on('interactionCreate', async (interaction) => {
             `**ID другого бота:** ${config.otherBotId || '—'}`,
             `**ID admin роли:** ${process.env.ADMIN_ROLE_ID || '—'}`,
             '',
-            '**Начисление баллов:**',
+            '**Отчётность:**',
+            `📋 Канал отчётности: ${config.reportChannelId ? `<#${config.reportChannelId}>` : '—'}`,
+            `🔍 Канал проверки: ${config.reportReviewChannelId ? `<#${config.reportReviewChannelId}>` : '(тот же)'}`,
+            `🔑 Кейворды:\n${kwLines}`,
+            '',
+            '**Начисление баллов (другой бот):**',
             `✅ Кандидат принят: +${config.scoring.accepted}`,
             `❌ Кандидат отклонён: +${config.scoring.rejected}`,
             `🚶 Кандидат слился: ${config.scoring.candidateLeft}`,
@@ -424,6 +714,24 @@ client.on('interactionCreate', async (interaction) => {
           const id = interaction.options.getString('id');
           storage.setConfig({ otherBotId: id });
           return interaction.reply({ content: `✅ ID бота установлен: \`${id}\``, ephemeral: true });
+        }
+        if (sub === 'канал_отчётности') {
+          const id = interaction.options.getString('id');
+          storage.setConfig({ reportChannelId: id });
+          return interaction.reply({ content: `✅ Канал отчётности: <#${id}>`, ephemeral: true });
+        }
+        if (sub === 'канал_проверки') {
+          const id = interaction.options.getString('id');
+          storage.setConfig({ reportReviewChannelId: id });
+          return interaction.reply({ content: `✅ Канал проверки отчётов: <#${id}>`, ephemeral: true });
+        }
+        if (sub === 'баллы_за_отчёт') {
+          const kw  = interaction.options.getString('кейворд').toUpperCase();
+          const pts = interaction.options.getInteger('баллы');
+          const config = storage.getConfig();
+          const keywords = { ...(config.reportKeywords || {}), [kw]: pts };
+          storage.setConfig({ reportKeywords: keywords });
+          return interaction.reply({ content: `✅ Кейворд \`${kw}\` → **+${pts}** баллов.`, ephemeral: true });
         }
         break;
       }
