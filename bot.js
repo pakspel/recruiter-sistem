@@ -4,7 +4,8 @@ const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
   ModalBuilder, TextInputBuilder, TextInputStyle
 } = require('discord.js');
-const storage = require('./storage');
+const storage      = require('./storage');
+const applications = require('./applications');
 
 const client = new Client({
   intents: [
@@ -95,6 +96,9 @@ const commands = [
     .setDescription('Как привязать свой Discord к аккаунту на сайте'),
 
 ].map(c => c.toJSON());
+
+// ── Дополнительные команды из модулей ──────────────────────
+commands.push(...applications.getCommands());
 
 // ─────────────────────────────────────
 //  Register slash commands
@@ -381,6 +385,7 @@ async function handleReportMessage(message) {
 client.once('clientReady', async () => {
   console.log(`🤖 Bot logged in as ${client.user.tag}`);
   await registerCommands();
+  applications.setup(client); // ← система заявок
 });
 
 client.on('messageCreate', async (message) => {
