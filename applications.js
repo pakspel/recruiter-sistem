@@ -22,6 +22,7 @@ const {
   ModalBuilder, TextInputBuilder, TextInputStyle,
   EmbedBuilder, ChannelType, PermissionsBitField
 } = require('discord.js');
+const storage = require('./storage');
 
 // ─────────────────────────────────────────────────────────────
 //  Slash command definitions (возвращаем уже .toJSON() объекты)
@@ -235,9 +236,11 @@ async function modalSubmitApplication(interaction) {
       .setEmoji('🎫')
   );
 
-  // Пингуем роль администраторов, если настроена
-  const adminRoleId = process.env.ADMIN_ROLE_ID;
-  const content = adminRoleId ? `<@&${adminRoleId}>` : undefined;
+  // Пингуем две роли рекрутов
+  const pingParts = [];
+  if (process.env.RECRUIT_ROLE_ID)   pingParts.push(`<@&${process.env.RECRUIT_ROLE_ID}>`);
+  if (process.env.RECRUIT_ROLE_ID_2) pingParts.push(`<@&${process.env.RECRUIT_ROLE_ID_2}>`);
+  const content = pingParts.length ? pingParts.join(' ') : undefined;
 
   await reviewChannel.send({ content, embeds: [embed], components: [row] });
 
@@ -254,14 +257,14 @@ async function btnApprove(interaction, applicantId) {
 
   await interaction.deferUpdate();
 
+  // ── Выдаём роль соискателю ────────────────────────────────
   const approvedRoleId = process.env.APPROVED_ROLE_ID;
   let roleNote = '';
-
   if (approvedRoleId) {
     try {
       const member = await interaction.guild.members.fetch(applicantId);
       await member.roles.add(approvedRoleId);
-      roleNote = ` Роль семьи выдана.`;
+      roleNote = ' Роль семьи выдана.';
     } catch (e) {
       console.error('[Applications] Не удалось выдать роль:', e);
       roleNote = ' ⚠️ Не удалось выдать роль — проверь права бота.';
@@ -270,21 +273,36 @@ async function btnApprove(interaction, applicantId) {
     roleNote = ' ⚙️ APPROVED_ROLE_ID не задан в .env.';
   }
 
-  // DM соискателю
+  // ── Начисляем баллы рекруту, который одобрил ─────────────
+  const recruiter = storage.get(interaction.user.id);
+  if (recruiter) {
+    const config = storage.getConfig();
+    const pts    = config.scoring?.accepted ?? 5;
+    storage.addPoints(
+      interaction.user.id, pts,
+      `Принял заявку кандидата <@${applicantId}>`,
+      'bot-auto', 'accepted'
+    );
+    roleNote += ` +${pts} баллов рекруту.`;
+  }
+
+  // ── Удаляем тикет-каналы если были созданы ───────────────
+  await deleteTicketChannels(interaction);
+
+  // ── DM соискателю ─────────────────────────────────────────
   try {
     const user = await interaction.client.users.fetch(applicantId);
     await user.send({ content: '✅ **Твоя заявка одобрена!** Добро пожаловать в семью!' });
   } catch (_) {}
 
-  // Обновляем embed в канале проверки
+  // ── Обновляем embed ───────────────────────────────────────
   const originalEmbed = interaction.message.embeds[0];
   const updatedEmbed = EmbedBuilder.from(originalEmbed)
     .setColor(0x2ecc71)
     .setTitle(originalEmbed.title?.replace('Заявка от', '✅ Заявка одобрена от') ?? '✅ Заявка одобрена')
-    .addFields({ name: '👮 Одобрил', value: `${interaction.user.tag}`, inline: true });
+    .addFields({ name: '👮 Одобрил', value: interaction.user.tag, inline: true });
 
-  const updatedContent = `${interaction.message.content || ''}\n✅ Одобрено.${roleNote}`.trim();
-  return interaction.editReply({ content: updatedContent, embeds: [updatedEmbed], components: [] });
+  return interaction.editReply({ content: `✅ Одобрено.${roleNote}`, embeds: [updatedEmbed], components: [] });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -297,7 +315,24 @@ async function btnReject(interaction, applicantId) {
 
   await interaction.deferUpdate();
 
-  // DM соискателю
+  // ── Начисляем баллы рекруту, который отклонил ────────────
+  let pointsNote = '';
+  const recruiter = storage.get(interaction.user.id);
+  if (recruiter) {
+    const config = storage.getConfig();
+    const pts    = config.scoring?.rejected ?? 3;
+    storage.addPoints(
+      interaction.user.id, pts,
+      `Отклонил заявку кандидата <@${applicantId}>`,
+      'bot-auto', 'rejected'
+    );
+    pointsNote = ` +${pts} баллов рекруту.`;
+  }
+
+  // ── Удаляем тикет-каналы если были созданы ───────────────
+  await deleteTicketChannels(interaction);
+
+  // ── DM соискателю ─────────────────────────────────────────
   try {
     const user = await interaction.client.users.fetch(applicantId);
     await user.send({
@@ -305,14 +340,14 @@ async function btnReject(interaction, applicantId) {
     });
   } catch (_) {}
 
-  // Обновляем embed
+  // ── Обновляем embed ───────────────────────────────────────
   const originalEmbed = interaction.message.embeds[0];
   const updatedEmbed = EmbedBuilder.from(originalEmbed)
     .setColor(0xe63946)
     .setTitle(originalEmbed.title?.replace('Заявка от', '❌ Заявка отклонена от') ?? '❌ Заявка отклонена')
-    .addFields({ name: '👮 Отклонил', value: `${interaction.user.tag}`, inline: true });
+    .addFields({ name: '👮 Отклонил', value: interaction.user.tag, inline: true });
 
-  return interaction.editReply({ embeds: [updatedEmbed], components: [] });
+  return interaction.editReply({ content: `❌ Отклонено.${pointsNote}`, embeds: [updatedEmbed], components: [] });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -470,6 +505,27 @@ async function btnCreateTicket(interaction, applicantId) {
     : `✅ Текстовый тикет создан: ${textChannel} (голосовой канал не удалось создать)`;
 
   return interaction.editReply({ content: replyText });
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Хелпер: удаляем тикет-каналы из embed поля «🎫 Тикет»
+// ─────────────────────────────────────────────────────────────
+async function deleteTicketChannels(interaction) {
+  const embed = interaction.message.embeds[0];
+  const ticketField = embed?.fields?.find(f => f.name === '🎫 Тикет');
+  if (!ticketField) return; // тикет не создавался
+
+  // Вытаскиваем все ID каналов из строки вида "<#123> / <#456>"
+  const channelIds = [...ticketField.value.matchAll(/<#(\d+)>/g)].map(m => m[1]);
+
+  for (const id of channelIds) {
+    try {
+      const ch = await interaction.guild.channels.fetch(id);
+      await ch.delete('Заявка закрыта');
+    } catch (e) {
+      console.warn(`[Applications] Не удалось удалить канал ${id}:`, e.message);
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
