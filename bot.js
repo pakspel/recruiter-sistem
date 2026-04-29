@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 const storage      = require('./storage');
 const applications = require('./applications');
+const vacations    = require('./vacations');
 
 const client = new Client({
   intents: [
@@ -99,6 +100,7 @@ const commands = [
 
 // ── Дополнительные команды из модулей ──────────────────────
 commands.push(...applications.getCommands());
+commands.push(...vacations.getCommands());
 
 // ─────────────────────────────────────
 //  Register slash commands
@@ -386,6 +388,7 @@ client.once('clientReady', async () => {
   console.log(`🤖 Bot logged in as ${client.user.tag}`);
   await registerCommands();
   applications.setup(client); // ← система заявок
+  vacations.setup(client);    // ← система отпусков
 });
 
 client.on('messageCreate', async (message) => {
