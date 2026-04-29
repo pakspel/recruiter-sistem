@@ -331,8 +331,8 @@ async function modalRejectReason(interaction, applicantId) {
 //  Хелпер: проверка прав
 // ─────────────────────────────────────────────────────────────
 function hasManageRoles(member) {
-  const adminRoleId = process.env.ADMIN_ROLE_ID;
-  if (adminRoleId && member.roles.cache.has(adminRoleId)) return true;
+  if (process.env.RECRUIT_ROLE_ID   && member.roles.cache.has(process.env.RECRUIT_ROLE_ID))   return true;
+  if (process.env.RECRUIT_ROLE_ID_2 && member.roles.cache.has(process.env.RECRUIT_ROLE_ID_2)) return true;
   return member.permissions.has(PermissionFlagsBits.ManageRoles);
 }
 
