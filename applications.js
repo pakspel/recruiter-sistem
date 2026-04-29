@@ -105,7 +105,9 @@ async function handleApplicationInteraction(interaction) {
 // ─────────────────────────────────────────────────────────────
 async function cmdSendPanel(interaction) {
   const embed = new EmbedBuilder()
-    .setDescription('Здесь вы можете подать заявку в семью')
+    .setDescription(
+      'Рады видеть тебя здесь! Если ты хочешь вступить в нашу семью — просто нажми на кнопку ниже и заполни небольшую анкету. Мы постараемся рассмотреть её как можно скорее 🤝'
+    )
     .setColor(0x5865F2);
 
   const row = new ActionRowBuilder().addComponents(
