@@ -371,6 +371,17 @@
       </div>
     </div>
 
+    <!-- Статистика приёма (для кураторов и администраторов) -->
+    <div id="acceptedStatsSection" style="display:none; margin-bottom:28px">
+      <div class="section-header" style="margin-top:28px">
+        <div class="section-title">📊 СТАТИСТИКА ПРИЁМА</div>
+        <span class="section-count" id="acceptedStatsCount"></span>
+      </div>
+      <div id="acceptedStatsContainer" style="background:var(--card);border:1px solid var(--border);padding:20px 22px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))">
+        <div style="color:var(--muted);font-family:'IBM Plex Mono';font-size:12px">⏳ Загрузка...</div>
+      </div>
+    </div>
+
     <!-- Tasks section -->
     <div class="section-header">
       <div class="section-title">МОИ ЗАДАНИЯ</div>
@@ -435,6 +446,7 @@ async function init() {
 
   loadTasks();
   loadDiscordStatus();
+  loadAcceptedStats();
 }
 
 // ── Discord привязка ──────────────────────────────────────
@@ -512,6 +524,71 @@ async function unlinkDiscord() {
 function showAuthWall() {
   document.getElementById('authWall').style.display = 'block';
   document.getElementById('cabinetContent').style.display = 'none';
+}
+
+async function loadAcceptedStats() {
+  // Показываем блок только для admin (куратора определяем по ответу сервера)
+  const section = document.getElementById('acceptedStatsSection');
+  const container = document.getElementById('acceptedStatsContainer');
+  const countEl = document.getElementById('acceptedStatsCount');
+
+  try {
+    const r = await fetch('/api/admin/accepted-stats', {headers:{'x-token':authToken}});
+    if (!r.ok) {
+      // Нет доступа — скрываем блок (рядовой рекрут)
+      section.style.display = 'none';
+      return;
+    }
+    const stats = await r.json();
+    section.style.display = 'block';
+
+    if (!stats.length) {
+      container.innerHTML = '<div style="color:var(--muted);font-family:\'IBM Plex Mono\';font-size:12px">Нет данных</div>';
+      return;
+    }
+
+    const medals = ['🥇','🥈','🥉'];
+    const totalAccepted = stats.reduce((s, r) => s + (r.totalAccepted||0), 0);
+    countEl.textContent = `${totalAccepted} принято всего`;
+
+    const rows = stats.map((rec, i) => {
+      const medal = medals[i] || `<span style="color:var(--muted);font-family:'IBM Plex Mono'">${i+1}.</span>`;
+      const bar = rec.totalAccepted > 0
+        ? `<div style="height:4px;background:rgba(168,85,247,0.15);border-radius:2px;margin-top:6px"><div style="height:4px;background:#a855f7;border-radius:2px;width:${Math.min(100, Math.round(rec.totalAccepted / Math.max(...stats.map(s=>s.totalAccepted)) * 100))}%"></div></div>`
+        : '';
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:12px">
+          <div style="display:flex;align-items:center;gap:10px;min-width:0">
+            <span style="font-size:18px;flex-shrink:0">${medal}</span>
+            <div style="min-width:0">
+              <div style="font-family:'IBM Plex Mono';font-size:13px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(rec.displayName)}</div>
+              ${bar}
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;flex-shrink:0;font-family:'IBM Plex Mono';font-size:12px;text-align:right">
+            <div>
+              <div style="color:#4ade80;font-size:16px;font-weight:700">${rec.totalAccepted}</div>
+              <div style="color:var(--muted);font-size:10px;letter-spacing:1px">ПРИНЯТО</div>
+            </div>
+            <div>
+              <div style="color:#f87171;font-size:16px;font-weight:700">${rec.totalRejected||0}</div>
+              <div style="color:var(--muted);font-size:10px;letter-spacing:1px">ОТКЛ.</div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">
+        Статистика по принятым заявкам · кто принял сколько людей
+      </div>
+      ${rows}
+      <div style="margin-top:12px;font-family:'IBM Plex Mono';font-size:11px;color:var(--muted)">
+        Итого принято: <b style="color:#a855f7">${totalAccepted}</b>
+      </div>`;
+  } catch (e) {
+    section.style.display = 'none';
+  }
 }
 
 async function loadTasks() {
