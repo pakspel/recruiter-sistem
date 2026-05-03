@@ -576,6 +576,26 @@ function load() {
   return { recruiters: getAll(), config: getConfig(), lastWeeklyBurn: lwb ? lwb.value : null };
 }
 
+// ── Статистика приёма (для кураторов/админов) ─────────────
+
+/**
+ * Возвращает список рекрутов с количеством принятых людей.
+ * Сортировка по убыванию total_accepted.
+ */
+function getAcceptedStats() {
+  return db.prepare(`
+    SELECT r.user_id AS discordId,
+           r.display_name AS displayName,
+           r.username,
+           r.total_accepted AS totalAccepted,
+           r.total_rejected AS totalRejected,
+           r.points,
+           r.status
+    FROM recruiters r
+    ORDER BY r.total_accepted DESC, r.points DESC
+  `).all();
+}
+
 module.exports = {
   load, getAll, get, register, addPoints, remove,
   getConfig, setConfig, getRank, doWeeklyBurn, isCurator,
@@ -588,4 +608,5 @@ module.exports = {
   adminAddRecruiter, renameRecruiter,
   generateLinkCode, consumeLinkCode,
   getPointsHistory, getAllPointsHistory,
+  getAcceptedStats,
 };

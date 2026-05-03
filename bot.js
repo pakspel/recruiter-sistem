@@ -85,9 +85,19 @@ const commands = [
         .addStringOption(o => o.setName('кейворд').setDescription('Кейворд (ТП / ВН / 5ВИТО / ...)').setRequired(true))
         .addIntegerOption(o => o.setName('баллы').setDescription('Сколько баллов начислять').setRequired(true)))
     .addSubcommand(s =>
+      s.setName('ссылка_обзвона').setDescription('Ссылка на обзвон (выдаётся при кейворде ОБЗВОН)')
+        .addStringOption(o => o.setName('url').setDescription('URL обзвона').setRequired(true)))
+    .addSubcommand(s =>
+      s.setName('откат_обзвона').setDescription('Ссылка для отката обзвона')
+        .addStringOption(o => o.setName('url').setDescription('URL отката').setRequired(true)))
+    .addSubcommand(s =>
       s.setName('показать').setDescription('Показать текущие настройки')),
 
-  // ── Новые команды ──────────────────
+  new SlashCommandBuilder()
+    .setName('статистика_приёма')
+    .setDescription('[Куратор/Админ] Кто принял сколько людей'),
+
+
   new SlashCommandBuilder()
     .setName('задания')
     .setDescription('Показать мои задания'),
@@ -252,6 +262,7 @@ async function parseOtherBotMessage(message) {
  */
 const DEFAULT_REPORT_KEYWORDS = { 'ТП': 5, 'ВН': 5, '5ВИТО': 5 };
 const ZADANIE_KEYWORD = 'ЗАДАНИЕ'; // баллы задаёт куратор
+const OBZVON_KEYWORD  = 'ОБЗВОН';  // куратор выдаёт ссылку на обзвон + откат
 
 function getReportKeywords(config) {
   return { ...DEFAULT_REPORT_KEYWORDS, ...(config.reportKeywords || {}) };
@@ -261,6 +272,8 @@ function getReportKeywords(config) {
 function detectKeyword(text, keywords) {
   // Сначала проверяем ЗАДАНИЕ отдельно
   if (text.toUpperCase().includes(ZADANIE_KEYWORD)) return { keyword: ZADANIE_KEYWORD, points: null };
+  // Проверяем ОБЗВОН отдельно
+  if (text.toUpperCase().includes(OBZVON_KEYWORD)) return { keyword: OBZVON_KEYWORD, points: null };
   for (const [kw, pts] of Object.entries(keywords)) {
     if (text.toUpperCase().includes(kw.toUpperCase())) return { keyword: kw, points: pts };
   }
@@ -290,13 +303,87 @@ async function handleReportMessage(message) {
   const keywords = getReportKeywords(config);
   const kwMatch  = detectKeyword(text, keywords);
 
+  const isObzvon  = kwMatch?.keyword === OBZVON_KEYWORD;
+  const isZadanie = kwMatch?.keyword === ZADANIE_KEYWORD;
+
+  // ── ОБЗВОН: особая логика — нужно 2 ссылки, фото не требуется ──
+  if (isObzvon) {
+    const urlRegex = /https?:\/\/[^\s]+/gi;
+    const links = text.match(urlRegex) || [];
+
+    if (links.length < 2) {
+      const reply = await message.reply({
+        content: [
+          '❌ **Отчёт ОБЗВОН не принят — нужно 2 ссылки:**',
+          '🔗 **Ссылка 1** — ссылка на Discord-сервер/канал обзвона',
+          '🎬 **Ссылка 2** — ссылка на видео/запись как ты его провёл',
+          '',
+          '**Формат:** `ОБЗВОН https://discord.gg/... https://youtu.be/...`',
+        ].join('\n')
+      });
+      setTimeout(() => reply.delete().catch(() => {}), 30_000);
+      return;
+    }
+
+    const recruiter = storage.get(message.author.id);
+    if (!recruiter) return;
+
+    const OBZVON_POINTS = 2;
+    const updated = storage.addPoints(
+      message.author.id, OBZVON_POINTS,
+      'Отчёт: ОБЗВОН', 'bot-report', 'report'
+    );
+
+    await message.react('✅').catch(() => {});
+
+    // Авто-сообщение рекруту прямо в канал отчётности
+    const confirmMsg = await message.reply({
+      content: [
+        `✅ **${recruiter.displayName}**, твой отчёт **ОБЗВОН** принят автоматически!`,
+        `💎 Начислено: **+${OBZVON_POINTS}** балла. Итого: **${updated.points}**.`,
+      ].join('\n')
+    });
+    setTimeout(() => confirmMsg.delete().catch(() => {}), 30_000);
+
+    // Карточка в канал проверки
+    const reviewChannelId = config.reportReviewChannelId || config.reportChannelId;
+    let reviewChannel;
+    try { reviewChannel = await message.client.channels.fetch(reviewChannelId); }
+    catch { return; }
+
+    const embed = new EmbedBuilder()
+      .setTitle('✅ Обзвон — +2 балла начислено автоматически')
+      .setColor(0xa855f7)
+      .addFields(
+        { name: '👤 Рекрут',             value: `${recruiter.displayName} (<@${message.author.id}>)`, inline: true },
+        { name: '🔑 Тип',                value: '`ОБЗВОН`', inline: true },
+        { name: '💎 Начислено',           value: `+${OBZVON_POINTS}`, inline: true },
+        { name: '📊 Итого',              value: `${updated.points} баллов`, inline: true },
+        { name: '🔗 Сообщение',          value: `[Перейти](${message.url})`, inline: true },
+        { name: '📅 Дата',               value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: true },
+        { name: '🔗 Ссылка 1 (Discord)', value: links[0].slice(0, 200), inline: false },
+        { name: '🎬 Ссылка 2 (Видео)',   value: links[1].slice(0, 200), inline: false }
+      )
+      .setFooter({ text: `ID: ${message.author.id} · msg: ${message.id}` });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`report_revoke:${message.author.id}:${OBZVON_POINTS}:${message.id}`)
+        .setLabel(`❌ Скам — снять ${OBZVON_POINTS} балла`)
+        .setStyle(ButtonStyle.Danger)
+    );
+
+    await reviewChannel.send({ embeds: [embed], components: [row] });
+    return;
+  }
+
   // Молчим если не похоже на отчёт (нет ни кейворда, ни фото вместе)
   if (!kwMatch && !hasPhoto) return;
 
-  // ── Валидация ─────────────────────────────────────────
+  // ── Валидация для обычных кейвордов ───────────────────
   const errors = [];
   if (!hasPhoto) errors.push('📷 **Нет фото-доказательства** — прикрепи скриншот');
-  if (!kwMatch)  errors.push(`🔑 **Нет кейворда** — укажи: ${[...Object.keys(keywords), ZADANIE_KEYWORD].join(' · ')}`);
+  if (!kwMatch)  errors.push(`🔑 **Нет кейворда** — укажи: ${[...Object.keys(keywords), OBZVON_KEYWORD, ZADANIE_KEYWORD].join(' · ')}`);
 
   if (errors.length) {
     const reply = await message.reply({
@@ -316,7 +403,6 @@ async function handleReportMessage(message) {
   catch { console.error('[Reports] Канал проверки не найден:', reviewChannelId); return; }
 
   const photo = message.attachments.first();
-  const isZadanie = kwMatch.keyword === ZADANIE_KEYWORD;
 
   if (isZadanie) {
     // ── ЗАДАНИЕ: баллы выставляет куратор вручную ────────
@@ -415,6 +501,7 @@ client.on('messageCreate', async (message) => {
 
 client.on('interactionCreate', async (interaction) => {
 
+
   // ── Modal submit: ЗАДАНИЕ — куратор указал баллы ──────────
   if (interaction.isModalSubmit() && interaction.customId.startsWith('zadanie_modal:')) {
     const parts      = interaction.customId.split(':');
@@ -510,6 +597,7 @@ client.on('interactionCreate', async (interaction) => {
       } catch {}
       return;
     }
+
 
     // ── Кнопка: ЗАДАНИЕ — открываем модал для ввода баллов ─
     if (action === 'zadanie_award') {
@@ -700,6 +788,8 @@ client.on('interactionCreate', async (interaction) => {
             `📋 Канал отчётности: ${config.reportChannelId ? `<#${config.reportChannelId}>` : '—'}`,
             `🔍 Канал проверки: ${config.reportReviewChannelId ? `<#${config.reportReviewChannelId}>` : '(тот же)'}`,
             `🔑 Кейворды:\n${kwLines}`,
+            `📞 ОБЗВОН — ссылка: ${config.obzvonLink || '—'}`,
+            `🔄 ОБЗВОН — откат: ${config.obzvonReset || '—'}`,
             '',
             '**Начисление баллов (другой бот):**',
             `✅ Кандидат принят: +${config.scoring.accepted}`,
@@ -741,10 +831,47 @@ client.on('interactionCreate', async (interaction) => {
           storage.setConfig({ reportKeywords: keywords });
           return interaction.reply({ content: `✅ Кейворд \`${kw}\` → **+${pts}** баллов.`, ephemeral: true });
         }
+        if (sub === 'ссылка_обзвона') {
+          const url = interaction.options.getString('url');
+          storage.setConfig({ obzvonLink: url });
+          return interaction.reply({ content: `✅ Ссылка на обзвон установлена: ${url}`, ephemeral: true });
+        }
+        if (sub === 'откат_обзвона') {
+          const url = interaction.options.getString('url');
+          storage.setConfig({ obzvonReset: url });
+          return interaction.reply({ content: `✅ Ссылка отката обзвона установлена: ${url}`, ephemeral: true });
+        }
         break;
       }
 
-      // ── Новые команды ──────────────────
+      case 'статистика_приёма': {
+        const config = storage.getConfig();
+        if (!isCuratorOrAdmin(interaction.member, config)) {
+          return interaction.reply({ content: '❌ Только кураторы и администраторы могут просматривать эту статистику.', ephemeral: true });
+        }
+
+        const stats = storage.getAcceptedStats();
+        if (!stats.length) {
+          return interaction.reply({ content: '📋 Нет данных о принятых людях.', ephemeral: true });
+        }
+
+        const medals = ['🥇', '🥈', '🥉'];
+        const rows = stats.map((r, i) => {
+          const medal = medals[i] || `**${i + 1}.**`;
+          return `${medal} **${r.displayName}** — ✅ ${r.totalAccepted} принято · ❌ ${r.totalRejected} отклонено`;
+        }).slice(0, 25);
+
+        const embed = new EmbedBuilder()
+          .setTitle('📊 Статистика приёма — кто принял сколько людей')
+          .setColor(0xa855f7)
+          .setDescription(rows.join('\n'))
+          .setTimestamp()
+          .setFooter({ text: `Всего рекрутов: ${stats.length}` });
+
+        return interaction.reply({ embeds: [embed], ephemeral: true });
+      }
+
+
 
       case 'задания': {
         await interaction.deferReply({ ephemeral: true });

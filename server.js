@@ -42,6 +42,20 @@ function requireAdmin(req, res, next) {
   req.session = session; next();
 }
 
+/** Доступ для кураторов (2000+ баллов) и администраторов */
+function requireCuratorOrAdmin(req, res, next) {
+  const session = storage.validateToken(req.headers['x-token'] || req.query.token);
+  if (!session) return res.status(401).json({ error: 'Не авторизован' });
+  if (session.role === 'admin') { req.session = session; return next(); }
+  // Проверяем баллы рекрута
+  const discordId = storage.getDiscordIdByLogin(session.login);
+  if (discordId) {
+    const rec = storage.get(discordId);
+    if (rec && storage.isCurator(rec.points)) { req.session = session; return next(); }
+  }
+  return res.status(403).json({ error: 'Нет доступа — требуется роль куратора или администратора' });
+}
+
 function requireRecruiter(req, res, next) {
   const session = storage.validateToken(req.headers['x-token'] || req.query.token);
   if (!session) return res.status(401).json({ error: 'Не авторизован' });
@@ -320,6 +334,11 @@ app.get('/api/history', requireAdmin, (req, res) => {
   const dateFrom = req.query.dateFrom || undefined;
   const dateTo   = req.query.dateTo   || undefined;
   res.json(storage.getAllPointsHistory({ userId, dateFrom, dateTo, limit, offset }));
+});
+
+/** Статистика приёма — кто принял сколько людей (для кураторов и выше) */
+app.get('/api/admin/accepted-stats', requireCuratorOrAdmin, (req, res) => {
+  res.json(storage.getAcceptedStats());
 });
 
 app.post('/api/register', requireApiKey, (req, res) => {
