@@ -105,12 +105,51 @@ db.exec(`
     discord_id TEXT NOT NULL,
     expires_at INTEGER NOT NULL
   );
+
+  -- News broadcasts
+  CREATE TABLE IF NOT EXISTS news (
+    news_id    TEXT PRIMARY KEY,
+    title      TEXT NOT NULL,
+    body       TEXT NOT NULL,
+    author     TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  -- Polls
+  CREATE TABLE IF NOT EXISTS polls (
+    poll_id     TEXT PRIMARY KEY,
+    question    TEXT NOT NULL,
+    options     TEXT NOT NULL,
+    channel_id  TEXT NOT NULL,
+    message_id  TEXT DEFAULT NULL,
+    author      TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    closed_at   TEXT DEFAULT NULL
+  );
+
+  -- Poll votes
+  CREATE TABLE IF NOT EXISTS poll_votes (
+    poll_id    TEXT NOT NULL,
+    discord_id TEXT NOT NULL,
+    option_idx INTEGER NOT NULL,
+    voted_at   TEXT NOT NULL,
+    PRIMARY KEY (poll_id, discord_id)
+  );
+
+  -- Sent deadline notifications (to avoid duplicates)
+  CREATE TABLE IF NOT EXISTS deadline_notifications (
+    task_id    TEXT NOT NULL,
+    discord_id TEXT NOT NULL,
+    sent_at    TEXT NOT NULL,
+    PRIMARY KEY (task_id, discord_id)
+  );
 `);
 
 // Soft migrations for existing DBs
 try { db.exec("ALTER TABLE users ADD COLUMN discord_id TEXT DEFAULT NULL"); } catch (_) {}
 try { db.exec("ALTER TABLE recruiters ADD COLUMN total_accepted INTEGER DEFAULT 0"); } catch (_) {}
 try { db.exec("ALTER TABLE recruiters ADD COLUMN total_rejected INTEGER DEFAULT 0"); } catch (_) {}
+try { db.exec("ALTER TABLE tasks ADD COLUMN deadline TEXT DEFAULT NULL"); } catch (_) {}
 
 // One-time data migration: JSON columns -> relational tables
 (function migrateJsonToRelational() {
@@ -202,6 +241,7 @@ function rowToTask(row) {
     description: row.description,
     assignedTo:  row.assigned_to,
     createdAt:   row.created_at,
+    deadline:    row.deadline || null,
     completedBy
   };
 }
@@ -446,13 +486,42 @@ function resolveAssignedTo(assignedTo) {
   return discordId || assignedTo;
 }
 
-function createTask(title, description, assignedTo) {
+function createTask(title, description, assignedTo, deadline) {
   const id         = crypto.randomBytes(8).toString('hex');
   const now        = new Date().toISOString();
   const normalised = resolveAssignedTo(assignedTo);
-  db.prepare(`INSERT INTO tasks (task_id,title,description,assigned_to,created_at,completed_by) VALUES (?,?,?,?,?,'[]')`)
-    .run(id, title, description || '', normalised, now);
-  return { id, title, description: description || '', assignedTo: normalised, createdAt: now, completedBy: [] };
+  const dl         = deadline || null;
+  db.prepare(`INSERT INTO tasks (task_id,title,description,assigned_to,created_at,deadline,completed_by) VALUES (?,?,?,?,?,?,'[]')`)
+    .run(id, title, description || '', normalised, now, dl);
+  return { id, title, description: description || '', assignedTo: normalised, createdAt: now, deadline: dl, completedBy: [] };
+}
+
+/**
+ * Возвращает задания с дедлайном в диапазоне [nowMs, nowMs + windowMs].
+ * Используется для уведомлений за 24 часа до сгорания дедлайна.
+ */
+function getTasksNearDeadline(windowMs = 24 * 60 * 60 * 1000) {
+  const now  = new Date();
+  const from = now.toISOString();
+  const to   = new Date(now.getTime() + windowMs).toISOString();
+  return db.prepare(
+    "SELECT * FROM tasks WHERE deadline IS NOT NULL AND deadline >= ? AND deadline <= ? ORDER BY deadline ASC"
+  ).all(from, to).map(rowToTask);
+}
+
+/**
+ * Проверяет, было ли уже отправлено уведомление о дедлайне этому пользователю.
+ */
+function isDeadlineNotified(taskId, discordId) {
+  return !!db.prepare('SELECT 1 FROM deadline_notifications WHERE task_id=? AND discord_id=?').get(taskId, discordId);
+}
+
+/**
+ * Отмечает что уведомление о дедлайне отправлено.
+ */
+function markDeadlineNotified(taskId, discordId) {
+  db.prepare('INSERT OR IGNORE INTO deadline_notifications (task_id, discord_id, sent_at) VALUES (?,?,?)')
+    .run(taskId, discordId, new Date().toISOString());
 }
 
 function getAllTasks() {
@@ -596,6 +665,74 @@ function getAcceptedStats() {
   `).all();
 }
 
+// ── News ──────────────────────────────────────────────────
+
+function createNews(title, body, author) {
+  const id  = crypto.randomBytes(8).toString('hex');
+  const now = new Date().toISOString();
+  db.prepare('INSERT INTO news (news_id,title,body,author,created_at) VALUES (?,?,?,?,?)')
+    .run(id, title, body, author, now);
+  return { id, title, body, author, createdAt: now };
+}
+
+function getRecentNews(limit = 10) {
+  return db.prepare('SELECT * FROM news ORDER BY created_at DESC LIMIT ?').all(limit)
+    .map(r => ({ id: r.news_id, title: r.title, body: r.body, author: r.author, createdAt: r.created_at }));
+}
+
+// ── Polls ─────────────────────────────────────────────────
+
+function createPoll(question, options, channelId, author) {
+  const id  = crypto.randomBytes(8).toString('hex');
+  const now = new Date().toISOString();
+  db.prepare('INSERT INTO polls (poll_id,question,options,channel_id,author,created_at) VALUES (?,?,?,?,?,?)')
+    .run(id, question, JSON.stringify(options), channelId, author, now);
+  return { id, question, options, channelId, author, createdAt: now, messageId: null, closedAt: null };
+}
+
+function setPollMessageId(pollId, messageId) {
+  db.prepare('UPDATE polls SET message_id=? WHERE poll_id=?').run(messageId, pollId);
+}
+
+function getPoll(pollId) {
+  const row = db.prepare('SELECT * FROM polls WHERE poll_id=?').get(pollId);
+  if (!row) return null;
+  const votes = db.prepare('SELECT option_idx, COUNT(*) AS cnt FROM poll_votes WHERE poll_id=? GROUP BY option_idx').all(pollId);
+  const voteCounts = {};
+  for (const v of votes) voteCounts[v.option_idx] = v.cnt;
+  return {
+    id: row.poll_id, question: row.question, options: JSON.parse(row.options),
+    channelId: row.channel_id, messageId: row.message_id,
+    author: row.author, createdAt: row.created_at, closedAt: row.closed_at,
+    voteCounts
+  };
+}
+
+function votePoll(pollId, discordId, optionIdx) {
+  const now = new Date().toISOString();
+  // Upsert — один голос на пользователя (можно поменять)
+  db.prepare('INSERT OR REPLACE INTO poll_votes (poll_id, discord_id, option_idx, voted_at) VALUES (?,?,?,?)')
+    .run(pollId, discordId, optionIdx, now);
+  return getPoll(pollId);
+}
+
+function closePoll(pollId) {
+  db.prepare("UPDATE polls SET closed_at=? WHERE poll_id=?").run(new Date().toISOString(), pollId);
+  return getPoll(pollId);
+}
+
+function getOpenPolls() {
+  return db.prepare('SELECT poll_id FROM polls WHERE closed_at IS NULL ORDER BY created_at DESC').all()
+    .map(r => getPoll(r.poll_id));
+}
+
+// ── DB Backup ─────────────────────────────────────────────
+
+/**
+ * Возвращает путь к файлу базы данных для бэкапа.
+ */
+function getDbPath() { return DB_PATH; }
+
 module.exports = {
   load, getAll, get, register, addPoints, remove,
   getConfig, setConfig, getRank, doWeeklyBurn, isCurator,
@@ -603,10 +740,14 @@ module.exports = {
   approveUser, approveUserWithRole, rejectUser,
   getPendingUsers, getRecruiters, changePassword, hashPassword,
   createTask, getAllTasks, getTasksForUser, completeTask, uncompleteTask, deleteTask,
+  getTasksNearDeadline, isDeadlineNotified, markDeadlineNotified,
   getAllUsersForAdmin, setUserRole,
   linkDiscordToUser, unlinkDiscord, getUserByDiscordId, getDiscordIdByLogin,
   adminAddRecruiter, renameRecruiter,
   generateLinkCode, consumeLinkCode,
   getPointsHistory, getAllPointsHistory,
   getAcceptedStats,
+  createNews, getRecentNews,
+  createPoll, setPollMessageId, getPoll, votePoll, closePoll, getOpenPolls,
+  getDbPath,
 };

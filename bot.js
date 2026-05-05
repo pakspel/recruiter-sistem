@@ -91,6 +91,9 @@ const commands = [
       s.setName('откат_обзвона').setDescription('Ссылка для отката обзвона')
         .addStringOption(o => o.setName('url').setDescription('URL отката').setRequired(true)))
     .addSubcommand(s =>
+      s.setName('канал_новостей').setDescription('Канал куда бот публикует новости')
+        .addStringOption(o => o.setName('id').setDescription('Channel ID').setRequired(true)))
+    .addSubcommand(s =>
       s.setName('показать').setDescription('Показать текущие настройки')),
 
   new SlashCommandBuilder()
@@ -105,6 +108,36 @@ const commands = [
   new SlashCommandBuilder()
     .setName('привязать')
     .setDescription('Как привязать свой Discord к аккаунту на сайте'),
+
+  new SlashCommandBuilder()
+    .setName('бэкап_бд')
+    .setDescription('[ADMIN] Скачать резервную копию базы данных')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+
+  new SlashCommandBuilder()
+    .setName('новость')
+    .setDescription('[ADMIN] Опубликовать новость для рекрутов')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption(o => o.setName('заголовок').setDescription('Заголовок новости').setRequired(true))
+    .addStringOption(o => o.setName('текст').setDescription('Текст новости').setRequired(true))
+    .addStringOption(o => o.setName('канал').setDescription('ID канала (по умолчанию — канал новостей из настроек)').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('опрос')
+    .setDescription('[ADMIN] Создать опрос для рекрутов')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption(o => o.setName('вопрос').setDescription('Вопрос опроса').setRequired(true))
+    .addStringOption(o => o.setName('вариант_1').setDescription('Вариант ответа 1').setRequired(true))
+    .addStringOption(o => o.setName('вариант_2').setDescription('Вариант ответа 2').setRequired(true))
+    .addStringOption(o => o.setName('вариант_3').setDescription('Вариант ответа 3').setRequired(false))
+    .addStringOption(o => o.setName('вариант_4').setDescription('Вариант ответа 4').setRequired(false))
+    .addStringOption(o => o.setName('канал').setDescription('ID канала для опроса').setRequired(false)),
+
+  new SlashCommandBuilder()
+    .setName('закрыть_опрос')
+    .setDescription('[ADMIN] Закрыть опрос и показать результаты')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption(o => o.setName('id').setDescription('ID опроса').setRequired(true)),
 
 ].map(c => c.toJSON());
 
@@ -629,6 +662,39 @@ client.on('interactionCreate', async (interaction) => {
 
     // ── Кнопки заданий (задачи рекрутов) ─────────────────
     const [taskAction, taskId, targetDiscordId] = parts;
+
+    // ── Кнопки голосования в опросе ───────────────────────
+    if (taskAction === 'poll_vote') {
+      const pollId    = taskId;
+      const optionIdx = parseInt(targetDiscordId);
+      const poll      = storage.getPoll(pollId);
+      if (!poll) return interaction.reply({ content: '❌ Опрос не найден.', ephemeral: true });
+      if (poll.closedAt) return interaction.reply({ content: '🔒 Опрос уже закрыт.', ephemeral: true });
+
+      const updated    = storage.votePoll(pollId, interaction.user.id, optionIdx);
+      const EMOJIS     = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+      const totalVotes = Object.values(updated.voteCounts).reduce((s, v) => s + v, 0);
+      const chosen     = updated.options[optionIdx];
+
+      // Обновляем embed с текущими результатами
+      const resultLines = updated.options.map((o, i) => {
+        const cnt = updated.voteCounts[i] || 0;
+        const pct = totalVotes > 0 ? Math.round(cnt / totalVotes * 100) : 0;
+        const bar = '█'.repeat(Math.round(pct / 10)) + '░'.repeat(10 - Math.round(pct / 10));
+        return `${EMOJIS[i]} **${o}** — ${cnt} (${pct}%)\n${bar}`;
+      }).join('\n\n');
+
+      const embed = new EmbedBuilder()
+        .setTitle(`📊 Опрос`)
+        .setDescription(`**${updated.question}**\n\n${resultLines}`)
+        .setColor(0x60a5fa)
+        .setFooter({ text: `ID: ${pollId} · Всего голосов: ${totalVotes}` })
+        .setTimestamp();
+
+      try { await interaction.message.edit({ embeds: [embed] }); } catch (_) {}
+      return interaction.reply({ content: `✅ Ты проголосовал за: **${chosen}**`, ephemeral: true });
+    }
+
     if (taskAction === 'complete_task' || taskAction === 'uncomplete_task') {
       if (interaction.user.id !== targetDiscordId) {
         return interaction.reply({ content: '❌ Это не твоё задание.', ephemeral: true });
@@ -841,6 +907,11 @@ client.on('interactionCreate', async (interaction) => {
           storage.setConfig({ obzvonReset: url });
           return interaction.reply({ content: `✅ Ссылка отката обзвона установлена: ${url}`, ephemeral: true });
         }
+        if (sub === 'канал_новостей') {
+          const id = interaction.options.getString('id');
+          storage.setConfig({ newsChannelId: id });
+          return interaction.reply({ content: `✅ Канал новостей установлен: <#${id}>`, ephemeral: true });
+        }
         break;
       }
 
@@ -924,7 +995,15 @@ client.on('interactionCreate', async (interaction) => {
           const isDone = (t.completedBy || []).includes(interaction.user.id);
           const target = t.assignedTo !== 'all' ? ' *(личное)*' : '';
           const desc = t.description ? `\n> ${t.description}` : '';
-          return `${isDone ? '✅' : '🔲'} **${t.title}**${target}${desc}`;
+          let deadlineStr = '';
+          if (t.deadline) {
+            const dl = new Date(t.deadline);
+            const hoursLeft = Math.round((dl - Date.now()) / 36e5);
+            const dlFormatted = dl.toLocaleString('ru', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+            const urgency = hoursLeft <= 6 ? '🔴' : hoursLeft <= 24 ? '🟡' : '🕐';
+            deadlineStr = `\n${urgency} Дедлайн: **${dlFormatted}** (осталось ~${hoursLeft}ч.)`;
+          }
+          return `${isDone ? '✅' : '🔲'} **${t.title}**${target}${desc}${deadlineStr}`;
         });
 
         const embed = new EmbedBuilder()
@@ -965,6 +1044,155 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         return interaction.editReply({ embeds: [embed], components: rows });
+      }
+
+      case 'бэкап_бд': {
+        if (!hasAdminRole(interaction.member))
+          return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
+
+        await interaction.deferReply({ ephemeral: true });
+        const dbPath = storage.getDbPath();
+        const fs = require('fs');
+
+        if (!fs.existsSync(dbPath))
+          return interaction.editReply({ content: '❌ Файл базы данных не найден.' });
+
+        const backupName = `backup_${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
+        const backupPath = require('path').join(require('os').tmpdir(), backupName);
+        fs.copyFileSync(dbPath, backupPath);
+
+        const stats = fs.statSync(backupPath);
+        const sizeMb = (stats.size / 1024 / 1024).toFixed(2);
+
+        await interaction.editReply({
+          content: `✅ **Бэкап базы данных**\n📦 Размер: **${sizeMb} MB**\n📅 Дата: ${new Date().toLocaleString('ru')}\n\n⬇️ Файл прикреплён:`,
+          files: [{ attachment: backupPath, name: backupName }]
+        });
+
+        // Удаляем временный файл через 30 секунд
+        setTimeout(() => { try { fs.unlinkSync(backupPath); } catch (_) {} }, 30_000);
+        break;
+      }
+
+      case 'новость': {
+        if (!hasAdminRole(interaction.member))
+          return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
+
+        const title  = interaction.options.getString('заголовок');
+        const body   = interaction.options.getString('текст');
+        const config = storage.getConfig();
+        const channelId = interaction.options.getString('канал') || config.newsChannelId;
+
+        if (!channelId)
+          return interaction.reply({
+            content: '❌ Укажи канал для новости или настрой его командой `/настройки канал_новостей`.',
+            ephemeral: true
+          });
+
+        const channel = await client.channels.fetch(channelId).catch(() => null);
+        if (!channel)
+          return interaction.reply({ content: `❌ Канал <#${channelId}> не найден.`, ephemeral: true });
+
+        const news = storage.createNews(title, body, interaction.user.username);
+
+        const embed = new EmbedBuilder()
+          .setTitle(`📢 ${title}`)
+          .setDescription(body)
+          .setColor(0xf59e0b)
+          .setAuthor({ name: `📰 Новости рекрутинга`, iconURL: interaction.guild?.iconURL() || undefined })
+          .setFooter({ text: `Опубликовал: ${interaction.user.displayName || interaction.user.username}` })
+          .setTimestamp();
+
+        await channel.send({ embeds: [embed] });
+        await interaction.reply({ content: `✅ Новость **"${title}"** опубликована в <#${channelId}>!`, ephemeral: true });
+        break;
+      }
+
+      case 'опрос': {
+        if (!hasAdminRole(interaction.member))
+          return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
+
+        const question = interaction.options.getString('вопрос');
+        const opts = [
+          interaction.options.getString('вариант_1'),
+          interaction.options.getString('вариант_2'),
+          interaction.options.getString('вариант_3'),
+          interaction.options.getString('вариант_4'),
+        ].filter(Boolean);
+
+        const config = storage.getConfig();
+        const channelId = interaction.options.getString('канал') || config.newsChannelId || interaction.channelId;
+        const channel = await client.channels.fetch(channelId).catch(() => null);
+        if (!channel)
+          return interaction.reply({ content: `❌ Канал не найден.`, ephemeral: true });
+
+        const poll = storage.createPoll(question, opts, channelId, interaction.user.username);
+
+        const POLL_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+        const optLines = opts.map((o, i) => `${POLL_EMOJIS[i]} ${o}`).join('\n');
+
+        const embed = new EmbedBuilder()
+          .setTitle(`📊 Опрос`)
+          .setDescription(`**${question}**\n\n${optLines}`)
+          .setColor(0x60a5fa)
+          .setFooter({ text: `ID опроса: ${poll.id} · Нажми кнопку чтобы проголосовать` })
+          .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+          opts.map((o, i) =>
+            new ButtonBuilder()
+              .setCustomId(`poll_vote:${poll.id}:${i}`)
+              .setLabel(`${POLL_EMOJIS[i]} ${o.slice(0, 50)}`)
+              .setStyle(ButtonStyle.Primary)
+          )
+        );
+
+        const msg = await channel.send({ embeds: [embed], components: [row] });
+        storage.setPollMessageId(poll.id, msg.id);
+
+        await interaction.reply({
+          content: `✅ Опрос создан в <#${channelId}>!\n🆔 ID опроса: \`${poll.id}\`\nЧтобы закрыть: \`/закрыть_опрос id:${poll.id}\``,
+          ephemeral: true
+        });
+        break;
+      }
+
+      case 'закрыть_опрос': {
+        if (!hasAdminRole(interaction.member))
+          return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
+
+        const pollId = interaction.options.getString('id');
+        const poll   = storage.getPoll(pollId);
+        if (!poll) return interaction.reply({ content: '❌ Опрос не найден.', ephemeral: true });
+        if (poll.closedAt) return interaction.reply({ content: '⚠️ Опрос уже закрыт.', ephemeral: true });
+
+        const closed = storage.closePoll(pollId);
+        const POLL_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣'];
+        const totalVotes = Object.values(closed.voteCounts).reduce((s, v) => s + v, 0);
+
+        const resultLines = closed.options.map((o, i) => {
+          const cnt = closed.voteCounts[i] || 0;
+          const pct = totalVotes > 0 ? Math.round(cnt / totalVotes * 100) : 0;
+          const bar = '█'.repeat(Math.round(pct / 10)) + '░'.repeat(10 - Math.round(pct / 10));
+          return `${POLL_EMOJIS[i]} **${o}**\n${bar} ${cnt} голос(ов) (${pct}%)`;
+        }).join('\n\n');
+
+        const embed = new EmbedBuilder()
+          .setTitle(`📊 Результаты опроса — закрыт`)
+          .setDescription(`**${closed.question}**\n\n${resultLines}`)
+          .setColor(0x6b7280)
+          .setFooter({ text: `Всего проголосовало: ${totalVotes} · ID: ${pollId}` })
+          .setTimestamp();
+
+        // Обновляем оригинальное сообщение (убираем кнопки)
+        try {
+          const ch  = await client.channels.fetch(closed.channelId);
+          const msg = await ch.messages.fetch(closed.messageId);
+          await msg.edit({ embeds: [embed], components: [] });
+        } catch (_) {}
+
+        await interaction.reply({ content: `✅ Опрос закрыт. Результаты опубликованы в <#${closed.channelId}>.`, ephemeral: true });
+        break;
       }
 
       case 'привязать': {
@@ -1013,9 +1241,80 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
+// ─────────────────────────────────────
+//  Deadline notification scheduler
+// ─────────────────────────────────────
+
+/**
+ * Каждый час проверяем задания с дедлайном в ближайшие 24 часа
+ * и шлём DM рекрутам, которые ещё не получили уведомление.
+ */
+async function checkDeadlineNotifications() {
+  try {
+    const tasks = storage.getTasksNearDeadline(24 * 60 * 60 * 1000);
+    if (!tasks.length) return;
+
+    const allRecruiters = Object.values(storage.getAll()).filter(r => r.status !== 'kicked');
+
+    for (const task of tasks) {
+      const deadline    = new Date(task.deadline);
+      const hoursLeft   = Math.round((deadline - Date.now()) / 36e5);
+      const deadlineStr = deadline.toLocaleString('ru', { timeZone: 'Europe/Moscow', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+      // Определяем, кому слать уведомление
+      let targets = [];
+      if (task.assignedTo === 'all') {
+        targets = allRecruiters;
+      } else {
+        const r = storage.get(task.assignedTo);
+        if (r) targets = [r];
+      }
+
+      for (const recruiter of targets) {
+        // Уже отметили как выполненное — не беспокоим
+        if ((task.completedBy || []).includes(recruiter.discordId)) continue;
+        // Уже отправляли уведомление
+        if (storage.isDeadlineNotified(task.id, recruiter.discordId)) continue;
+
+        try {
+          const user = await client.users.fetch(recruiter.discordId);
+          const embed = new EmbedBuilder()
+            .setTitle('⏰ Дедлайн приближается!')
+            .setColor(hoursLeft <= 6 ? 0xef4444 : 0xf59e0b)
+            .setDescription(
+              `У тебя есть невыполненное задание с дедлайном!\n\n` +
+              `📋 **Задание:** ${task.title}\n` +
+              (task.description ? `> ${task.description}\n\n` : '\n') +
+              `⏳ **Осталось:** примерно **${hoursLeft} ч.**\n` +
+              `🕐 **Дедлайн:** ${deadlineStr} (МСК)\n\n` +
+              `Используй \`/задания\` чтобы отметить выполнение.`
+            )
+            .setTimestamp();
+
+          await user.send({ embeds: [embed] });
+          storage.markDeadlineNotified(task.id, recruiter.discordId);
+          console.log(`⏰ Deadline notification sent to ${recruiter.displayName} for task "${task.title}"`);
+        } catch (err) {
+          // DM закрыты — пропускаем
+          console.log(`Could not send deadline DM to ${recruiter.discordId}: ${err.message}`);
+          storage.markDeadlineNotified(task.id, recruiter.discordId); // не спамим
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Deadline checker error:', err);
+  }
+}
+
 function startBot() {
   client.login(process.env.BOT_TOKEN)
-    .then(() => console.log('🔑 Bot token accepted'))
+    .then(() => {
+      console.log('🔑 Bot token accepted');
+      // Запускаем проверку дедлайнов каждый час
+      setInterval(checkDeadlineNotifications, 60 * 60 * 1000);
+      // Первая проверка через 30 секунд после старта
+      setTimeout(checkDeadlineNotifications, 30_000);
+    })
     .catch(err => console.error('❌ Bot login failed:', err));
 }
 

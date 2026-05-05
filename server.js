@@ -137,9 +137,17 @@ app.post('/api/admin/reject', requireAdmin, (req, res) => {
 app.get('/api/admin/tasks', requireAdmin, (req, res) => res.json(storage.getAllTasks()));
 
 app.post('/api/admin/tasks', requireAdmin, (req, res) => {
-  const { title, description, assignedTo } = req.body;
+  const { title, description, assignedTo, deadline } = req.body;
   if (!title) return res.status(400).json({ error: 'Укажи название задания' });
-  res.json(storage.createTask(title, description, assignedTo || 'all'));
+  // Валидация дедлайна
+  let dl = null;
+  if (deadline) {
+    const d = new Date(deadline);
+    if (isNaN(d.getTime())) return res.status(400).json({ error: 'Некорректный формат дедлайна' });
+    if (d <= new Date()) return res.status(400).json({ error: 'Дедлайн должен быть в будущем' });
+    dl = d.toISOString();
+  }
+  res.json(storage.createTask(title, description, assignedTo || 'all', dl));
 });
 
 app.delete('/api/admin/tasks/:id', requireAdmin, (req, res) => {
@@ -353,6 +361,48 @@ app.delete('/api/recruiter/:id', requireApiKey, (req, res) => {
 
 app.post('/api/weekly-burn', requireApiKey, (req, res) => {
   res.json(storage.doWeeklyBurn());
+});
+
+// ── News ──────────────────────────────────────────────────
+
+app.get('/api/admin/news', requireAdmin, (req, res) => {
+  res.json(storage.getRecentNews(20));
+});
+
+app.post('/api/admin/news', requireAdmin, (req, res) => {
+  const { title, body } = req.body;
+  if (!title || !body) return res.status(400).json({ error: 'Укажи заголовок и текст новости' });
+  res.json(storage.createNews(title, body, req.session.login));
+});
+
+// ── Polls ─────────────────────────────────────────────────
+
+app.get('/api/polls', requireRecruiter, (req, res) => {
+  res.json(storage.getOpenPolls());
+});
+
+app.get('/api/polls/:id', requireRecruiter, (req, res) => {
+  const poll = storage.getPoll(req.params.id);
+  if (!poll) return res.status(404).json({ error: 'Опрос не найден' });
+  res.json(poll);
+});
+
+app.post('/api/polls/:id/vote', requireRecruiter, (req, res) => {
+  const { optionIdx } = req.body;
+  if (optionIdx === undefined) return res.status(400).json({ error: 'Укажи optionIdx' });
+  const poll = storage.getPoll(req.params.id);
+  if (!poll) return res.status(404).json({ error: 'Опрос не найден' });
+  if (poll.closedAt) return res.status(400).json({ error: 'Опрос уже закрыт' });
+  const discordId = storage.getDiscordIdByLogin(req.session.login);
+  if (!discordId) return res.status(400).json({ error: 'Привяжи Discord аккаунт' });
+  res.json(storage.votePoll(req.params.id, discordId, parseInt(optionIdx)));
+});
+
+app.post('/api/admin/polls/:id/close', requireAdmin, (req, res) => {
+  const poll = storage.getPoll(req.params.id);
+  if (!poll) return res.status(404).json({ error: 'Опрос не найден' });
+  if (poll.closedAt) return res.status(400).json({ error: 'Опрос уже закрыт' });
+  res.json(storage.closePoll(req.params.id));
 });
 
 function startServer() {
