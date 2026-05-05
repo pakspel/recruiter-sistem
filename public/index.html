@@ -597,6 +597,11 @@
           <option value="all">👥 Всем рекрутам</option>
         </select>
       </div>
+      <div class="form-group">
+        <label class="form-label">⏰ Дедлайн (необязательно)</label>
+        <input class="form-input" type="datetime-local" id="taskDeadline" />
+        <div style="font-size:11px;color:var(--muted,#6b7280);margin-top:4px">За 24 часа до дедлайна рекруты получат DM-уведомление</div>
+      </div>
       <button class="btn-primary purple" onclick="createTask()">СОЗДАТЬ ЗАДАНИЕ</button>
     </div>
 
@@ -1140,6 +1145,7 @@ async function loadAdminTasks() {
             ${t.assignedTo === 'all' ? '👥 Все рекруты' : '👤 ' + esc(t.assignedTo)} ·
             <span style="color:${count > 0 ? '#2ecc71' : 'var(--muted)'}">Выполнили: ${count}</span>${count > 0 ? ` <span class="task-done-toggle" onclick="toggleCompletors('${tid}')">▾ показать</span>` : ''} ·
             ${new Date(t.createdAt).toLocaleDateString('ru')}
+            ${t.deadline ? (() => { const dl = new Date(t.deadline); const h = Math.round((dl - Date.now())/36e5); const c = h <= 6 ? '#ef4444' : h <= 24 ? '#f59e0b' : '#60a5fa'; return ` · <span style="color:${c}">⏰ Дедлайн: ${dl.toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} (~${h}ч.)</span>`; })() : ''}
           </div>
           ${count > 0 ? `<div class="task-completors" id="${tid}">${tags}</div>` : ''}
           ${t.description ? `<div class="task-meta" style="margin-top:4px;color:var(--dim)">${esc(t.description)}</div>` : ''}
@@ -1178,13 +1184,15 @@ async function loadRecruitersForSelect() {
 }
 
 async function createTask() {
+  const deadlineRaw = document.getElementById('taskDeadline').value;
+  const deadline = deadlineRaw ? new Date(deadlineRaw).toISOString() : null;
   const title = document.getElementById('taskTitle').value.trim();
   const desc = document.getElementById('taskDesc').value.trim();
   const assignedTo = document.getElementById('taskAssign').value;
   if (!title) return showMsg('tasksAdminMsg','УКАЖИ НАЗВАНИЕ ЗАДАНИЯ','error');
   const r = await fetch('/api/admin/tasks', {
     method:'POST', headers:{'Content-Type':'application/json','x-token':authToken},
-    body: JSON.stringify({title, description: desc, assignedTo})
+    body: JSON.stringify({title, description: desc, assignedTo, deadline})
   });
   const d = await r.json();
   if (d.id) {
@@ -1192,6 +1200,7 @@ async function createTask() {
     document.getElementById('taskTitle').value = '';
     document.getElementById('taskDesc').value = '';
     document.getElementById('taskAssign').value = 'all';
+    document.getElementById('taskDeadline').value = '';
     loadAdminTasks();
   } else {
     showMsg('tasksAdminMsg', d.error || 'ОШИБКА', 'error');

@@ -655,6 +655,19 @@ function renderTasks() {
     const isDone = currentDiscordId && t.completedBy.includes(currentDiscordId);
     const isPersonal = t.assignedTo !== 'all';
     const date = new Date(t.createdAt).toLocaleDateString('ru', {day:'numeric', month:'short'});
+
+    let deadlineHtml = '';
+    if (t.deadline) {
+      const dl = new Date(t.deadline);
+      const hoursLeft = Math.round((dl - Date.now()) / 36e5);
+      const dlStr = dl.toLocaleString('ru', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+      const urgencyColor = hoursLeft <= 6 ? '#ef4444' : hoursLeft <= 24 ? '#f59e0b' : '#60a5fa';
+      const urgencyIcon  = hoursLeft <= 6 ? '🔴' : hoursLeft <= 24 ? '🟡' : '⏰';
+      if (!isDone) {
+        deadlineHtml = `<span style="font-size:11px;color:${urgencyColor};font-family:'IBM Plex Mono',monospace;">${urgencyIcon} Дедлайн: ${dlStr} (~${hoursLeft}ч.)</span>`;
+      }
+    }
+
     return `
     <div class="task-card${isDone ? ' completed' : ''}" id="tc-${t.id}" style="animation-delay:${idx*50}ms">
       <div class="task-check" id="chk-${t.id}" onclick="toggleTask('${t.id}', ${isDone})">
@@ -668,6 +681,7 @@ function renderTasks() {
             ${isPersonal ? '👤 ЛИЧНОЕ' : '👥 ОБЩЕЕ'}
           </span>
           ${isDone ? '<span class="task-badge done-badge">✓ ВЫПОЛНЕНО</span>' : ''}
+          ${deadlineHtml}
           <span class="task-date">${date}</span>
         </div>
       </div>
