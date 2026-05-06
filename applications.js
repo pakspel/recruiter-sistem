@@ -253,8 +253,9 @@ async function modalSubmitApplication(interaction) {
 //  Кнопка «Одобрить»
 // ─────────────────────────────────────────────────────────────
 async function btnApprove(interaction, applicantId) {
-  if (!hasManageRoles(interaction.member)) {
-    return interaction.reply({ content: '❌ Только администраторы могут управлять заявками.', ephemeral: true });
+  const embed = interaction.message.embeds[0];
+  if (!canReviewApplication(interaction.member, embed)) {
+    return interaction.reply({ content: '❌ Одобрить заявку может только тот, кто создал тикет, куратор или администратор.', ephemeral: true });
   }
 
   await interaction.deferUpdate();
@@ -298,10 +299,9 @@ async function btnApprove(interaction, applicantId) {
   } catch (_) {}
 
   // ── Обновляем embed ───────────────────────────────────────
-  const originalEmbed = interaction.message.embeds[0];
-  const updatedEmbed = EmbedBuilder.from(originalEmbed)
+  const updatedEmbed = EmbedBuilder.from(embed)
     .setColor(0x2ecc71)
-    .setTitle(originalEmbed.title?.replace('Заявка от', '✅ Заявка одобрена от') ?? '✅ Заявка одобрена')
+    .setTitle(embed.title?.replace('Заявка от', '✅ Заявка одобрена от') ?? '✅ Заявка одобрена')
     .addFields({ name: '👮 Одобрил', value: interaction.user.tag, inline: true });
 
   return interaction.editReply({ content: `✅ Одобрено.${roleNote}`, embeds: [updatedEmbed], components: [] });
@@ -311,8 +311,9 @@ async function btnApprove(interaction, applicantId) {
 //  Кнопка «Отклонить»
 // ─────────────────────────────────────────────────────────────
 async function btnReject(interaction, applicantId) {
-  if (!hasManageRoles(interaction.member)) {
-    return interaction.reply({ content: '❌ Только администраторы могут управлять заявками.', ephemeral: true });
+  const embed = interaction.message.embeds[0];
+  if (!canReviewApplication(interaction.member, embed)) {
+    return interaction.reply({ content: '❌ Отклонить заявку может только тот, кто создал тикет, куратор или администратор.', ephemeral: true });
   }
 
   await interaction.deferUpdate();
@@ -343,10 +344,9 @@ async function btnReject(interaction, applicantId) {
   } catch (_) {}
 
   // ── Обновляем embed ───────────────────────────────────────
-  const originalEmbed = interaction.message.embeds[0];
-  const updatedEmbed = EmbedBuilder.from(originalEmbed)
+  const updatedEmbed = EmbedBuilder.from(embed)
     .setColor(0xe63946)
-    .setTitle(originalEmbed.title?.replace('Заявка от', '❌ Заявка отклонена от') ?? '❌ Заявка отклонена')
+    .setTitle(embed.title?.replace('Заявка от', '❌ Заявка отклонена от') ?? '❌ Заявка отклонена')
     .addFields({ name: '👮 Отклонил', value: interaction.user.tag, inline: true });
 
   return interaction.editReply({ content: `❌ Отклонено.${pointsNote}`, embeds: [updatedEmbed], components: [] });
@@ -482,13 +482,20 @@ async function btnCreateTicket(interaction, applicantId) {
 
   // Обновляем embed в канале проверки — дизейблим кнопку «Создать тикет»
   const updatedEmbed = EmbedBuilder.from(existingEmbed)
-    .addFields({
-      name: '🎫 Тикет',
-      value: voiceChannel
-        ? `${textChannel} / ${voiceChannel}`
-        : `${textChannel}`,
-      inline: true
-    });
+    .addFields(
+      {
+        name: '🎫 Тикет',
+        value: voiceChannel
+          ? `${textChannel} / ${voiceChannel}`
+          : `${textChannel}`,
+        inline: true
+      },
+      {
+        name: '👤 Создал тикет',
+        value: `<@${interaction.user.id}>`,
+        inline: true
+      }
+    );
 
   const oldRow = interaction.message.components[0];
   const newButtons = oldRow.components.map(comp => {
@@ -531,7 +538,37 @@ async function deleteTicketChannels(interaction) {
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Хелпер: проверка прав на управление ролями
+//  Хелпер: может ли участник одобрить / отклонить заявку
+//
+//  Разрешено если выполняется хотя бы одно условие:
+//    1. Администратор (роль ADMIN_ROLE_ID или право Manage Roles)
+//    2. Куратор (роль CURATOR_ROLE_ID или >= 2000 баллов в системе)
+//    3. Именно тот, кто создал тикет (поле "Создал тикет" в embed)
+// ─────────────────────────────────────────────────────────────
+function canReviewApplication(member, embed) {
+  // 1. Администратор
+  const adminRoleId = process.env.ADMIN_ROLE_ID;
+  if (adminRoleId && member.roles.cache.has(adminRoleId)) return true;
+  if (member.permissions.has(PermissionFlagsBits.ManageRoles)) return true;
+
+  // 2. Куратор
+  const curatorRoleId = process.env.CURATOR_ROLE_ID;
+  if (curatorRoleId && member.roles.cache.has(curatorRoleId)) return true;
+  const recruiter = storage.get(member.id);
+  if (recruiter && recruiter.points >= 2000) return true;
+
+  // 3. Создатель тикета
+  const creatorField = embed?.fields?.find(f => f.name === '\u{1F464} \u0421\u043E\u0437\u0434\u0430\u043B \u0442\u0438\u043A\u0435\u0442');
+  if (creatorField) {
+    const creatorId = creatorField.value.match(/<@(\d+)>/)?.[1];
+    if (creatorId && creatorId === member.id) return true;
+  }
+
+  return false;
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Хелпер: проверка прав на управление ролями (создание тикетов)
 // ─────────────────────────────────────────────────────────────
 function hasManageRoles(member) {
   if (process.env.RECRUIT_ROLE_ID   && member.roles.cache.has(process.env.RECRUIT_ROLE_ID))   return true;
