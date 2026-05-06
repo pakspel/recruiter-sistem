@@ -32,7 +32,7 @@ function getCommands() {
     new SlashCommandBuilder()
       .setName('заявка_панель')
       .setDescription('[ADMIN] Отправить кнопку «Подать заявку» в текущий канал')
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
       .toJSON()
   ];
 }
@@ -549,7 +549,6 @@ function canReviewApplication(member, embed) {
   // 1. Администратор
   const adminRoleId = process.env.ADMIN_ROLE_ID;
   if (adminRoleId && member.roles.cache.has(adminRoleId)) return true;
-  if (member.permissions.has(PermissionFlagsBits.ManageRoles)) return true;
 
   // 2. Куратор
   const curatorRoleId = process.env.CURATOR_ROLE_ID;
@@ -573,7 +572,7 @@ function canReviewApplication(member, embed) {
 function hasManageRoles(member) {
   if (process.env.RECRUIT_ROLE_ID   && member.roles.cache.has(process.env.RECRUIT_ROLE_ID))   return true;
   if (process.env.RECRUIT_ROLE_ID_2 && member.roles.cache.has(process.env.RECRUIT_ROLE_ID_2)) return true;
-  return member.permissions.has(PermissionFlagsBits.ManageRoles);
+  return false;
 }
 
 module.exports = { getCommands, setup };

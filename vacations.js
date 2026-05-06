@@ -24,7 +24,7 @@ function getCommands() {
     new SlashCommandBuilder()
       .setName('отпуск_панель')
       .setDescription('[ADMIN] Отправить панель заявок на отпуск в текущий канал')
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
       .toJSON()
   ];
 }
@@ -333,7 +333,7 @@ async function modalRejectReason(interaction, applicantId) {
 function hasManageRoles(member) {
   if (process.env.RECRUIT_ROLE_ID   && member.roles.cache.has(process.env.RECRUIT_ROLE_ID))   return true;
   if (process.env.RECRUIT_ROLE_ID_2 && member.roles.cache.has(process.env.RECRUIT_ROLE_ID_2)) return true;
-  return member.permissions.has(PermissionFlagsBits.ManageRoles);
+  return false;
 }
 
 module.exports = { getCommands, setup };

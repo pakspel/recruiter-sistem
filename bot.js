@@ -21,7 +21,7 @@ const client = new Client({
 // ─────────────────────────────────────
 function hasAdminRole(member) {
   const roleId = process.env.ADMIN_ROLE_ID;
-  if (!roleId) return member.permissions.has(PermissionFlagsBits.ManageRoles);
+  if (!roleId) return false;
   return member.roles.cache.has(roleId);
 }
 
