@@ -2,7 +2,8 @@ const {
   Client, GatewayIntentBits, REST, Routes,
   SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits,
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  ModalBuilder, TextInputBuilder, TextInputStyle
+  ModalBuilder, TextInputBuilder, TextInputStyle,
+  ActivityType
 } = require('discord.js');
 const storage      = require('./storage');
 const applications = require('./applications');
@@ -139,6 +140,21 @@ const commands = [
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption(o => o.setName('id').setDescription('ID опроса').setRequired(true)),
 
+  new SlashCommandBuilder()
+    .setName('статус_бота')
+    .setDescription('[ADMIN] Изменить мемный статус бота (последний в очереди)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+    .addStringOption(o =>
+      o.setName('текст').setDescription('Текст статуса').setRequired(true))
+    .addStringOption(o =>
+      o.setName('тип').setDescription('Тип активности (по умолчанию: Слушает)').setRequired(false)
+        .addChoices(
+          { name: '🎵 Слушает',       value: 'listening'  },
+          { name: '📺 Смотрит',       value: 'watching'   },
+          { name: '🎮 Играет',        value: 'playing'    },
+          { name: '🏆 Соревнуется в', value: 'competing'  }
+        )),
+
 ].map(c => c.toJSON());
 
 // ── Дополнительные команды из модулей ──────────────────────
@@ -160,6 +176,101 @@ async function registerCommands() {
   } catch (err) {
     console.error('❌ Failed to register commands:', err);
   }
+}
+
+// ─────────────────────────────────────
+//  Динамические статусы бота
+// ─────────────────────────────────────
+
+const CURATOR_MIN_POINTS = 2000;
+
+/**
+ * Собирает список статусов с актуальными данными из БД.
+ * Кураторы (>= 2000 баллов) не считаются в топе и не входят в "активных рекрутов".
+ */
+async function buildStatuses(client) {
+  const all = Object.values(storage.getAll());
+  const nonCurators = all.filter(r => r.status !== 'kicked' && r.points < CURATOR_MIN_POINTS);
+
+  // 👥 Активных рекрутов
+  const activeCount = nonCurators.filter(r => r.status !== 'kicked').length;
+
+  // 🏆 Лидер (топ-1 среди не-кураторов)
+  const sorted = [...nonCurators].sort((a, b) => b.points - a.points);
+  const leader = sorted[0];
+  const leaderText = leader
+    ? `🏆 Лидер: ${leader.displayName} — ${leader.points} баллов`
+    : '🏆 Лидер: ещё нет данных';
+
+  // 📋 Заявок на рассмотрении (считаем сообщения с кнопкой "Одобрить" в канале проверки)
+  let pendingCount = 0;
+  const reviewChannelId = process.env.APPLICATION_REVIEW_CHANNEL_ID;
+  if (reviewChannelId) {
+    try {
+      const ch = await client.channels.fetch(reviewChannelId);
+      const msgs = await ch.messages.fetch({ limit: 100 });
+      pendingCount = msgs.filter(m =>
+        m.components.length > 0 &&
+        m.components[0].components.some(c => c.customId?.startsWith('app:approve'))
+      ).size;
+    } catch (_) { /* канал недоступен — просто 0 */ }
+  }
+
+  // 📅 До списания: берём lastWeeklyBurn из мета и прибавляем 7 дней
+  let daysUntilBurn = '?';
+  try {
+    const { lastWeeklyBurn } = storage.load();
+    if (lastWeeklyBurn) {
+      const next = new Date(new Date(lastWeeklyBurn).getTime() + 7 * 24 * 60 * 60 * 1000);
+      const diff = Math.ceil((next - Date.now()) / (1000 * 60 * 60 * 24));
+      daysUntilBurn = Math.max(0, diff);
+    }
+  } catch (_) {}
+
+  // 📊 Всего заявок = сумма принятых + отклонённых по всем рекрутам
+  const totalApps = all.reduce((s, r) => s + (r.totalAccepted || 0) + (r.totalRejected || 0), 0);
+
+  // 🎵 Мемный статус (можно менять через /статус_бота)
+  const config      = storage.getConfig();
+  const memeText    = config.memeStatusText || 'мальчик поплыл, мальчик пропал — Анна Асти';
+  const memeTypeKey = config.memeStatusType || 'listening';
+  const typeMap     = {
+    listening:  ActivityType.Listening,
+    watching:   ActivityType.Watching,
+    playing:    ActivityType.Playing,
+    competing:  ActivityType.Competing,
+  };
+  const memeType = typeMap[memeTypeKey] ?? ActivityType.Listening;
+
+  return [
+    { name: `👥 Активных рекрутов: ${activeCount}`,           type: ActivityType.Watching  },
+    { name: `📋 Заявок на рассмотрении: ${pendingCount}`,     type: ActivityType.Watching  },
+    { name: leaderText,                                          type: ActivityType.Watching  },
+    { name: `📅 До списания: ${daysUntilBurn} дн.`,           type: ActivityType.Watching  },
+    { name: `📊 Всего заявок получено: ${totalApps}`,         type: ActivityType.Watching  },
+    { name: '👨‍💻 Разработчик: PAKSPEL',                         type: ActivityType.Watching  },
+    { name: memeText,                                            type: memeType               },
+  ];
+}
+
+let _statusIndex    = 0;
+let _statusInterval = null;
+
+async function rotateStatus(client) {
+  try {
+    const statuses = await buildStatuses(client);
+    const s = statuses[_statusIndex % statuses.length];
+    client.user.setPresence({ status: 'online', activities: [{ name: s.name, type: s.type }] });
+    _statusIndex++;
+  } catch (err) {
+    console.error('[StatusRotation] Ошибка обновления статуса:', err);
+  }
+}
+
+function startStatusRotation(client) {
+  rotateStatus(client); // сразу при старте
+  if (_statusInterval) clearInterval(_statusInterval);
+  _statusInterval = setInterval(() => rotateStatus(client), 30_000); // каждые 30 секунд
 }
 
 // ─────────────────────────────────────
@@ -508,6 +619,7 @@ client.once('clientReady', async () => {
   await registerCommands();
   applications.setup(client); // ← система заявок
   vacations.setup(client);    // ← система отпусков
+  startStatusRotation(client); // ← ротация статусов каждые 30 сек
 });
 
 client.on('messageCreate', async (message) => {
@@ -1192,6 +1304,32 @@ client.on('interactionCreate', async (interaction) => {
         } catch (_) {}
 
         await interaction.reply({ content: `✅ Опрос закрыт. Результаты опубликованы в <#${closed.channelId}>.`, ephemeral: true });
+        break;
+      }
+
+      case 'статус_бота': {
+        if (!hasAdminRole(interaction.member))
+          return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
+
+        const newText    = interaction.options.getString('текст');
+        const newTypeKey = interaction.options.getString('тип') || 'listening';
+
+        storage.setConfig({ memeStatusText: newText, memeStatusType: newTypeKey });
+
+        // Сбрасываем индекс на мемный статус (последний) и сразу применяем
+        _statusIndex = 6; // индекс мемного статуса
+        await rotateStatus(client);
+
+        const typeLabels = {
+          listening: '🎵 Слушает',
+          watching:  '📺 Смотрит',
+          playing:   '🎮 Играет',
+          competing: '🏆 Соревнуется в',
+        };
+        await interaction.reply({
+          content: `✅ Мемный статус обновлён!\n> ${typeLabels[newTypeKey] ?? '🎵 Слушает'}: **${newText}**`,
+          ephemeral: true
+        });
         break;
       }
 
