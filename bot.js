@@ -182,15 +182,13 @@ async function registerCommands() {
 //  Динамические статусы бота
 // ─────────────────────────────────────
 
-const CURATOR_MIN_POINTS = 2000;
-
 /**
  * Собирает список статусов с актуальными данными из БД.
  * Кураторы (>= 2000 баллов) не считаются в топе и не входят в "активных рекрутов".
  */
 async function buildStatuses(client) {
   const all = Object.values(storage.getAll());
-  const nonCurators = all.filter(r => r.status !== 'kicked' && r.points < CURATOR_MIN_POINTS);
+  const nonCurators = all.filter(r => r.status !== 'kicked' && !storage.isCurator(r.points));
 
   // 👥 Активных рекрутов
   const activeCount = nonCurators.filter(r => r.status !== 'kicked').length;
@@ -208,11 +206,19 @@ async function buildStatuses(client) {
   if (reviewChannelId) {
     try {
       const ch = await client.channels.fetch(reviewChannelId);
-      const msgs = await ch.messages.fetch({ limit: 100 });
-      pendingCount = msgs.filter(m =>
-        m.components.length > 0 &&
-        m.components[0].components.some(c => c.customId?.startsWith('app:approve'))
-      ).size;
+      let lastId;
+      while (true) {
+        const opts = { limit: 100 };
+        if (lastId) opts.before = lastId;
+        const batch = await ch.messages.fetch(opts);
+        if (batch.size === 0) break;
+        pendingCount += batch.filter(m =>
+          m.components.length > 0 &&
+          m.components[0].components.some(c => c.customId?.startsWith('app:approve'))
+        ).size;
+        if (batch.size < 100) break;
+        lastId = batch.last().id;
+      }
     } catch (_) { /* канал недоступен — просто 0 */ }
   }
 
