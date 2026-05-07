@@ -191,7 +191,7 @@ async function buildStatuses(client) {
   const nonCurators = all.filter(r => r.status !== 'kicked' && !storage.isCurator(r.points));
 
   // 👥 Активных рекрутов
-  const activeCount = nonCurators.filter(r => r.status !== 'kicked').length;
+  const activeCount = nonCurators.length;
 
   // 🏆 Лидер (топ-1 среди не-кураторов)
   const sorted = [...nonCurators].sort((a, b) => b.points - a.points);
@@ -1193,7 +1193,7 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       case 'новость': {
-        if (!hasAdminRole(interaction.member))
+        if (!isCuratorOrAdmin(interaction.member, storage.getConfig()))
           return interaction.reply({ content: '❌ Недостаточно прав.', ephemeral: true });
 
         const title  = interaction.options.getString('заголовок');
@@ -1221,7 +1221,9 @@ client.on('interactionCreate', async (interaction) => {
           .setFooter({ text: `Опубликовал: ${interaction.user.displayName || interaction.user.username}` })
           .setTimestamp();
 
-        await channel.send({ embeds: [embed] });
+        const recruitRoleId = process.env.RECRUIT_ROLE_ID;
+        const roleTag = recruitRoleId ? `<@&${recruitRoleId}>` : null;
+        await channel.send({ content: roleTag || undefined, embeds: [embed] });
         await interaction.reply({ content: `✅ Новость **"${title}"** опубликована в <#${channelId}>!`, ephemeral: true });
         break;
       }
@@ -1322,8 +1324,9 @@ client.on('interactionCreate', async (interaction) => {
 
         storage.setConfig({ memeStatusText: newText, memeStatusType: newTypeKey });
 
-        // Сбрасываем индекс на мемный статус (последний) и сразу применяем
-        _statusIndex = 6; // индекс мемного статуса
+        // Ставим индекс на последний статус (мемный) и сразу применяем
+        const _tempStatuses = await buildStatuses(client);
+        _statusIndex = _tempStatuses.length - 1;
         await rotateStatus(client);
 
         const typeLabels = {
