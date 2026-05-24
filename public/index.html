@@ -6,372 +6,723 @@
 <title>Рейтинг Рекрутов</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:       #050508;
-    --surface:  #0d0d14;
-    --card:     #11111a;
-    --border:   #1e1e2e;
-    --red:      #e63946;
-    --gold:     #e9c46a;
-    --amber:    #f4a261;
-    --green:    #2ec27e;
-    --purple:   #a78bfa;
-    --blue:     #60a5fa;
-    --muted:    #555570;
-    --text:     #d8d8e8;
-    --dim:      #888899;
-    --white:    #f0f0fa;
+    /* Layered backgrounds */
+    --bg:           #050507;
+    --bg-elevated:  #0a0a0e;
+    --surface:      #0f0f15;
+    --card:         #12121b;
+
+    /* Borders */
+    --border:       #1a1a22;
+    --border-mid:   #25252e;
+    --border-strong:#35353f;
+
+    /* Accent (refined red) */
+    --red:          #ff4d5f;
+    --red-soft:     rgba(255,77,95,0.08);
+    --red-edge:     rgba(255,77,95,0.3);
+    --red-glow:     rgba(255,77,95,0.45);
+
+    /* Semantic */
+    --gold:         #f5c542;
+    --amber:        #f4a261;
+    --green:        #2ec27e;
+    --purple:       #b39bff;
+    --blue:         #7dadff;
+
+    /* Text */
+    --text:         #e8e8f0;
+    --white:        #f5f5fa;
+    --dim:          #888899;
+    --muted:        #5a5a6a;
+    --faint:        #3a3a48;
   }
 
   html { scroll-behavior: smooth; }
   body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Rajdhani', sans-serif; min-height: 100vh; overflow-x: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 400;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.005em;
   }
   body::before {
-    content: ''; position: fixed; inset: 0;
-    background-image: linear-gradient(rgba(230,57,70,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(230,57,70,.03) 1px, transparent 1px);
-    background-size: 40px 40px; pointer-events: none; z-index: 0;
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 40%, transparent 90%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(circle at 15% 0%, var(--red-soft), transparent 45%),
+      radial-gradient(circle at 85% 100%, rgba(255,77,95,0.04), transparent 50%);
+    pointer-events: none; z-index: 0;
   }
 
-  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; }
+  .wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 0 24px 80px; }
 
   /* ── Header ── */
   header {
-    padding: 50px 0 40px; display: flex; align-items: flex-end; justify-content: space-between;
-    gap: 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 40px;
+    padding: 48px 0 32px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 24px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
     animation: fadeDown .6s ease both;
   }
-  .logo { display: flex; align-items: flex-end; gap: 16px; }
+  .logo { display: flex; align-items: center; gap: 18px; }
   .logo-icon {
-    width: 56px; height: 56px; background: var(--red);
-    display: grid; place-items: center; font-size: 28px;
-    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-    cursor: pointer; transition: .2s; position: relative;
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--red) 0%, #c93444 100%);
+    display: grid; place-items: center;
+    font-size: 24px;
+    border-radius: var(--r-md, 10px);
+    cursor: pointer;
+    transition: transform .2s ease, box-shadow .3s ease;
+    position: relative;
+    box-shadow:
+      0 4px 24px var(--red-glow),
+      0 0 0 1px rgba(255,255,255,0.06) inset;
   }
-  .logo-icon:hover { background: #c0252e; }
-  .logo-icon.logged-in { background: #1a3a2a; border: 1px solid var(--green); }
+  .logo-icon:hover { transform: translateY(-1px); box-shadow: 0 6px 32px var(--red-glow), 0 0 0 1px rgba(255,255,255,0.1) inset; }
+  .logo-icon.logged-in {
+    background: linear-gradient(135deg, #1f4d3a 0%, #154029 100%);
+    box-shadow: 0 4px 24px rgba(46,194,126,0.35), 0 0 0 1px rgba(46,194,126,0.3) inset;
+  }
   .logo-icon.logged-in::after {
-    content: ''; position: absolute; bottom: 8px; right: 8px;
-    width: 8px; height: 8px; background: var(--green); border-radius: 50%; box-shadow: 0 0 6px var(--green);
+    content: ''; position: absolute; bottom: 6px; right: 6px;
+    width: 8px; height: 8px; background: var(--green); border-radius: 50%;
+    box-shadow: 0 0 8px var(--green);
   }
+  .logo-icon.is-admin {
+    background: linear-gradient(135deg, #2d2154 0%, #1f1641 100%);
+    box-shadow: 0 4px 24px rgba(179,155,255,0.35), 0 0 0 1px rgba(179,155,255,0.3) inset;
+  }
+  .logo-icon.is-admin::after { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
 
-  /* Admin badge on logo icon */
-  .logo-icon.is-admin { background: #1a1a3a; border: 1px solid var(--purple); }
-  .logo-icon.is-admin::after { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
-
-  h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(32px, 6vw, 52px); letter-spacing: 3px; line-height: 1; color: var(--white); }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: clamp(28px, 4.5vw, 42px);
+    letter-spacing: -0.025em;
+    line-height: 1;
+    color: var(--white);
+  }
   h1 span { color: var(--red); }
+  .h-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    margin-top: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .h-sub::before {
+    content: ''; width: 6px; height: 6px; background: var(--red);
+    border-radius: 50%; box-shadow: 0 0 6px var(--red-glow);
+  }
 
   .meta {
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--dim);
-    letter-spacing: 1px; text-transform: uppercase; display: flex; flex-direction: column; gap: 4px; text-align: right;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--muted); letter-spacing: 0.5px;
+    display: flex; flex-direction: column; gap: 5px; text-align: right;
   }
-  .meta strong { color: var(--muted); }
+  .meta strong { color: var(--text); font-weight: 500; }
+  .meta > span { display: block; }
 
-  /* ── Toolbar / nav strip ── */
+  /* ── Toolbar ── */
   .toolbar {
-    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px;
-    animation: fadeUp .5s .2s ease both;
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px;
+    animation: fadeUp .5s .15s ease both;
   }
   .filter-btn {
-    background: transparent; border: 1px solid var(--border);
-    color: var(--dim); font-family: 'Rajdhani', sans-serif;
-    font-weight: 600; font-size: 13px; letter-spacing: 1px;
-    padding: 7px 18px; cursor: pointer; transition: .2s;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500; font-size: 12px; letter-spacing: 0.4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all .18s ease;
+    border-radius: 8px;
+    text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: 6px;
   }
-  .filter-btn:hover, .filter-btn.active { background: var(--red); border-color: var(--red); color: #fff; }
-  .filter-btn.curator-filter:hover, .filter-btn.curator-filter.active { background: var(--purple); border-color: var(--purple); }
-  .filter-btn.admin-btn { border-color: rgba(167,139,250,.4); color: var(--purple); }
-  .filter-btn.admin-btn:hover, .filter-btn.admin-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; }
-  .filter-btn.cabinet-btn { border-color: rgba(96,165,250,.4); color: var(--blue); }
-  .filter-btn.cabinet-btn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .filter-btn.history-btn { border-color: rgba(251,191,36,.35); color: #f59e0b; }
-  .filter-btn.history-btn:hover { background: #f59e0b; border-color: #f59e0b; color: #000; }
-  .filter-btn.lk-btn { border-color: rgba(96,165,250,.4); color: var(--blue); }
-  .filter-btn.lk-btn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
-  /* Completed-by block inside task card */
-  .task-completors { margin-top: 6px; display: none; flex-wrap: wrap; gap: 4px; }
-  .task-completors.open { display: flex; }
-  .completor-tag {
-    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
-    background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.3);
-    color: #2ecc71; border-radius: 4px; padding: 2px 7px;
+  .filter-btn:hover { border-color: var(--border-strong); color: var(--text); background: rgba(255,255,255,0.02); }
+  .filter-btn.active {
+    background: var(--red);
+    border-color: var(--red);
+    color: #fff;
+    box-shadow: 0 4px 16px var(--red-glow);
   }
-  .task-done-toggle {
-    display: inline-block; cursor: pointer; font-size: 10px;
-    font-family: 'IBM Plex Mono', monospace; color: #2ecc71;
-    border: 1px solid rgba(46,204,113,.35); border-radius: 4px;
-    padding: 1px 6px; margin-left: 4px; user-select: none;
-  }
-  .task-done-toggle:hover { background: rgba(46,204,113,.12); }
+  .filter-btn.curator-filter:hover { border-color: rgba(179,155,255,0.4); color: var(--purple); }
+  .filter-btn.curator-filter.active { background: var(--purple); border-color: var(--purple); box-shadow: 0 4px 16px rgba(179,155,255,0.35); }
+  .filter-btn.admin-btn { border-color: rgba(179,155,255,0.35); color: var(--purple); }
+  .filter-btn.admin-btn:hover { background: rgba(179,155,255,0.08); }
+  .filter-btn.admin-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; box-shadow: 0 4px 16px rgba(179,155,255,0.35); }
+  .filter-btn.cabinet-btn, .filter-btn.lk-btn { border-color: rgba(125,173,255,0.35); color: var(--blue); }
+  .filter-btn.cabinet-btn:hover, .filter-btn.lk-btn:hover { background: rgba(125,173,255,0.08); }
+  .filter-btn.history-btn { border-color: rgba(245,197,66,0.35); color: var(--gold); }
+  .filter-btn.history-btn:hover { background: rgba(245,197,66,0.08); }
 
-  /* Pending badge */
   .pending-badge {
     display: inline-flex; align-items: center; justify-content: center;
-    background: var(--red); color: #fff; border-radius: 50%;
-    width: 16px; height: 16px; font-size: 10px; font-weight: 700;
-    margin-left: 6px; vertical-align: middle;
+    background: var(--red); color: #fff;
+    border-radius: 999px;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    font-size: 10px; font-weight: 600;
+    margin-left: 4px;
+    box-shadow: 0 0 12px var(--red-glow);
   }
 
   .spacer { flex: 1; }
-  .update-info { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); align-self: center; }
+  .update-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--muted);
+    align-self: center;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .update-info::before {
+    content: ''; width: 6px; height: 6px; background: var(--green);
+    border-radius: 50%; box-shadow: 0 0 6px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
   /* ── Stats ── */
   .stats-row {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px; margin-bottom: 32px; animation: fadeUp .5s .1s ease both;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px; margin-bottom: 36px;
+    animation: fadeUp .5s .1s ease both;
   }
   .stat-card {
-    background: var(--card); border: 1px solid var(--border); padding: 16px 20px;
-    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    background: linear-gradient(180deg, var(--card) 0%, var(--bg-elevated) 100%);
+    border: 1px solid var(--border);
+    padding: 18px 22px;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s ease, transform .2s ease;
   }
-  .stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
-  .stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 2px; color: var(--white); }
-  .stat-value.red    { color: var(--red); }
-  .stat-value.gold   { color: var(--gold); }
-  .stat-value.purple { color: var(--purple); }
+  .stat-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  }
+  .stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--muted);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .stat-value {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 32px;
+    color: var(--white);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .stat-value.red    { color: var(--red);   text-shadow: 0 0 24px rgba(255,77,95,0.3); }
+  .stat-value.gold   { color: var(--gold);  text-shadow: 0 0 24px rgba(245,197,66,0.25); }
+  .stat-value.purple { color: var(--purple);text-shadow: 0 0 24px rgba(179,155,255,0.25); }
 
   /* ── Table ── */
-  .table-wrap { animation: fadeUp .5s .3s ease both; }
-  table { width: 100%; border-collapse: collapse; }
-  thead tr { border-bottom: 1px solid var(--red); }
-  th {
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 1.5px;
-    text-transform: uppercase; color: var(--muted); padding: 12px 16px;
-    text-align: left; cursor: pointer; white-space: nowrap; user-select: none;
+  .table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    animation: fadeUp .5s .25s ease both;
   }
-  th:hover { color: var(--red); }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr {
+    background: rgba(255,255,255,0.015);
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted);
+    padding: 14px 18px;
+    text-align: left; cursor: pointer; white-space: nowrap;
+    user-select: none; font-weight: 500;
+    transition: color .15s;
+  }
+  th:hover { color: var(--text); }
   th.sorted { color: var(--red); }
   th.sorted::after { content: ' ↓'; }
   th.sorted.asc::after { content: ' ↑'; }
 
-  tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; animation: fadeRow .4s ease both; }
-  tbody tr:hover { background: rgba(230,57,70,.04); }
-  tbody tr.curator-row { background: rgba(167,139,250,.03); }
-  tbody tr.curator-row:hover { background: rgba(167,139,250,.07); }
-  td { padding: 16px 16px; vertical-align: middle; font-size: 15px; font-weight: 500; }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background .15s;
+    animation: fadeRow .4s ease both;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,77,95,0.025); }
+  tbody tr.curator-row { background: rgba(179,155,255,0.025); }
+  tbody tr.curator-row:hover { background: rgba(179,155,255,0.05); }
 
-  .pos { font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); width: 44px; }
-  .pos-1, .pos-2, .pos-3 { font-size: 18px; }
-  .pos-1 { color: var(--gold); } .pos-2 { color: #aaa; } .pos-3 { color: var(--amber); }
+  /* Gold tint for #1 */
+  tbody tr:first-child:not(.curator-row) td {
+    background: linear-gradient(90deg, rgba(245,197,66,0.06), transparent 60%);
+  }
+
+  td { padding: 16px 18px; vertical-align: middle; font-size: 15px; font-weight: 500; }
+
+  .pos {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; color: var(--muted); width: 50px;
+    font-weight: 600;
+  }
+  .pos-1, .pos-2, .pos-3 { font-size: 20px; }
+  .pos-1 { color: var(--gold); text-shadow: 0 0 12px rgba(245,197,66,0.4); }
+  .pos-2 { color: #c0c0d0; }
+  .pos-3 { color: var(--amber); }
   .pos-cur { color: var(--purple); font-size: 18px; }
 
-  .recruiter-name { display: flex; align-items: center; gap: 12px; }
+  .recruiter-name { display: flex; align-items: center; gap: 14px; }
   .avatar {
-    width: 38px; height: 38px; background: var(--surface); border: 1px solid var(--border);
-    display: grid; place-items: center; font-size: 15px;
-    font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--dim); flex-shrink: 0;
-    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    width: 40px; height: 40px;
+    background: var(--surface);
+    border: 1px solid var(--border-mid);
+    display: grid; place-items: center;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--dim);
+    flex-shrink: 0;
+    border-radius: 10px;
+    transition: all .2s ease;
   }
-  .avatar.curator-av { border-color: var(--purple); color: var(--purple); }
-  .name-block { display: flex; flex-direction: column; gap: 2px; }
-  .display-name { color: var(--white); font-weight: 700; font-size: 15px; }
-  .discord-tag { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); }
+  tbody tr:first-child:not(.curator-row) .avatar {
+    border-color: rgba(245,197,66,0.4);
+    color: var(--gold);
+    background: rgba(245,197,66,0.06);
+    box-shadow: 0 0 0 1px rgba(245,197,66,0.1), 0 4px 16px rgba(245,197,66,0.15);
+  }
+  .avatar.curator-av {
+    border-color: rgba(179,155,255,0.5);
+    color: var(--purple);
+    background: rgba(179,155,255,0.06);
+  }
+  .name-block { display: flex; flex-direction: column; gap: 3px; }
+  .display-name { color: var(--white); font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
+  .discord-tag { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); }
 
-  .pts { font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 500; color: var(--white); }
+  .pts {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 18px; font-weight: 600;
+    color: var(--white);
+    letter-spacing: -0.01em;
+  }
   .pts.curator-pts { color: var(--purple); }
 
   .rank-badge {
     display: inline-flex; align-items: center; gap: 6px;
-    padding: 4px 12px; font-size: 12px; font-weight: 700; letter-spacing: .5px; border: 1px solid;
-    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    padding: 4px 11px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.2px;
+    border: 1px solid;
+    border-radius: 7px;
+    font-family: 'Space Grotesk', sans-serif;
   }
-  .rank-Стажёр  { color: var(--muted);   border-color: var(--muted);  }
-  .rank-Рекрут  { color: var(--text);    border-color: var(--border); }
-  .rank-Агент   { color: var(--amber);   border-color: var(--amber);  }
-  .rank-Элита   { color: var(--gold);    border-color: var(--gold);   background: rgba(233,196,106,.06); }
-  .rank-Куратор { color: var(--purple);  border-color: var(--purple); background: rgba(167,139,250,.06); }
+  .rank-Стажёр  { color: var(--muted);  border-color: var(--border-mid); }
+  .rank-Рекрут  { color: var(--text);   border-color: var(--border-strong); }
+  .rank-Агент   { color: var(--amber);  border-color: rgba(244,162,97,0.35); background: rgba(244,162,97,0.05); }
+  .rank-Элита   { color: var(--gold);   border-color: rgba(245,197,66,0.4);  background: rgba(245,197,66,0.06); }
+  .rank-Куратор { color: var(--purple); border-color: rgba(179,155,255,0.4); background: rgba(179,155,255,0.06); }
 
-  .buffer-wrap { min-width: 100px; }
-  .buffer-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
-  .buffer-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
-  .buffer-text { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted); }
+  .buffer-wrap { min-width: 110px; }
+  .buffer-bar {
+    height: 4px; background: var(--border);
+    border-radius: 99px; overflow: hidden;
+    margin-top: 6px;
+  }
+  .buffer-fill {
+    height: 100%; border-radius: 99px;
+    transition: width .5s ease;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .buffer-text { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); }
 
   .weeks { display: flex; gap: 4px; }
-  .week-dot { width: 8px; height: 8px; border-radius: 1px; }
-  .week-dot.on  { background: var(--green); }
-  .week-dot.off { background: var(--border); }
+  .week-dot {
+    width: 9px; height: 9px;
+    border-radius: 2px;
+  }
+  .week-dot.on  { background: var(--green); box-shadow: 0 0 6px rgba(46,194,126,0.4); }
+  .week-dot.off { background: var(--border-mid); }
 
-  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; flex-shrink: 0; }
-  .s-active  { background: var(--green);  box-shadow: 0 0 6px var(--green); }
-  .s-warning { background: var(--amber);  box-shadow: 0 0 6px var(--amber); }
-  .s-danger  { background: var(--red);    box-shadow: 0 0 6px var(--red); }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; margin-right: 8px; flex-shrink: 0;
+    vertical-align: middle;
+  }
+  .s-active  { background: var(--green);  box-shadow: 0 0 8px rgba(46,194,126,0.6); }
+  .s-warning { background: var(--amber);  box-shadow: 0 0 8px rgba(244,162,97,0.6); }
+  .s-danger  { background: var(--red);    box-shadow: 0 0 8px var(--red-glow); }
   .s-kicked  { background: var(--muted); }
-  .s-curator { background: var(--purple); box-shadow: 0 0 6px var(--purple); }
+  .s-curator { background: var(--purple); box-shadow: 0 0 8px rgba(179,155,255,0.6); }
+
+  td:last-child { white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.5px; color: var(--dim); text-transform: uppercase; }
 
   .edit-btn {
-    background: none; border: 1px solid transparent; color: var(--muted);
-    font-size: 12px; width: 28px; height: 28px; cursor: pointer;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    width: 30px; height: 30px;
+    cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center;
-    transition: .2s; opacity: 0;
-    clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+    transition: all .2s ease;
+    opacity: 0;
+    border-radius: 7px;
   }
   tbody tr:hover .edit-btn { opacity: 1; }
-  .edit-btn:hover { background: rgba(230,57,70,.15); border-color: var(--red); color: var(--red); }
-  tbody tr:first-child td { background: rgba(233,196,106,.025); }
+  .edit-btn:hover { background: var(--red-soft); border-color: var(--red); color: var(--red); }
 
   .empty { text-align: center; padding: 80px 20px; color: var(--muted); }
   .empty .big { font-size: 48px; margin-bottom: 12px; }
-  .empty p { font-size: 14px; letter-spacing: .5px; }
+  .empty p { font-size: 14px; letter-spacing: 0.5px; }
 
   @keyframes fadeDown { from { opacity:0; transform: translateY(-20px); } to { opacity:1; transform: none; } }
   @keyframes fadeUp   { from { opacity:0; transform: translateY(16px);  } to { opacity:1; transform: none; } }
   @keyframes fadeRow  { from { opacity:0; transform: translateX(-10px); } to { opacity:1; transform: none; } }
 
-  @media (max-width: 680px) { td.hide-sm, th.hide-sm { display: none; } td { padding: 12px 10px; } }
+  @media (max-width: 680px) {
+    td.hide-sm, th.hide-sm { display: none; }
+    td { padding: 14px 12px; }
+    th { padding: 12px 12px; }
+    header { padding: 32px 0 24px; }
+    .meta { font-size: 10px; }
+  }
 
   /* ── Modal base ── */
   .overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.85);
-    z-index: 200; display: none; align-items: center; justify-content: center;
-    backdrop-filter: blur(6px);
+    position: fixed; inset: 0;
+    background: rgba(5,5,7,0.75);
+    z-index: 200;
+    display: none; align-items: center; justify-content: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 20px;
   }
-  .overlay.open { display: flex; }
+  .overlay.open { display: flex; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
   .modal {
-    background: var(--card); border: 1px solid var(--border);
-    padding: 32px; width: 100%; max-width: 420px; margin: 1rem;
-    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+    background:
+      radial-gradient(circle at 0% 0%, rgba(255,77,95,0.06), transparent 60%),
+      var(--card);
+    border: 1px solid var(--border);
+    padding: 32px;
+    width: 100%; max-width: 440px;
+    border-radius: 16px;
     animation: fadeUp .3s ease both;
+    box-shadow:
+      0 24px 48px rgba(0,0,0,0.4),
+      0 0 0 1px rgba(255,255,255,0.02) inset;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
   }
-  .modal.wide { max-width: 620px; }
+  .modal.wide { max-width: 640px; }
+  .modal::-webkit-scrollbar { width: 6px; }
+  .modal::-webkit-scrollbar-track { background: transparent; }
+  .modal::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 3px; }
 
   .modal-title {
-    font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px;
-    color: var(--white); margin-bottom: 6px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    color: var(--white);
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+    line-height: 1.1;
   }
-  .modal-sub { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; margin-bottom: 24px; }
+  .modal-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--muted);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 28px;
+  }
 
-  .modal-tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
-  .modal-tab {
-    background: none; border: none; border-bottom: 2px solid transparent;
-    color: var(--dim); font-family: 'Rajdhani', sans-serif; font-weight: 600;
-    font-size: 14px; letter-spacing: 1px; padding: 8px 16px; cursor: pointer;
-    margin-bottom: -1px; transition: .15s;
+  .modal-tabs {
+    display: flex; gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
   }
+  .modal-tab {
+    background: none; border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--dim);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600; font-size: 13px;
+    letter-spacing: 0.5px;
+    padding: 10px 18px;
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: .15s;
+    text-transform: uppercase;
+  }
+  .modal-tab:hover { color: var(--text); }
   .modal-tab.active { color: var(--red); border-bottom-color: var(--red); }
   .modal-tab.purple-tab.active { color: var(--purple); border-bottom-color: var(--purple); }
 
   .modal-form { display: none; }
   .modal-form.active { display: block; }
 
-  .form-group { margin-bottom: 16px; }
-  .form-label { display: block; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
-  .form-input {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
-    color: var(--white); font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 500;
-    padding: 10px 14px; outline: none; transition: border-color .15s;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  .form-group { margin-bottom: 18px; }
+  .form-label {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--muted);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    margin-bottom: 8px;
   }
-  .form-input:focus { border-color: var(--red); }
+  .form-input {
+    width: 100%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--white);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 15px; font-weight: 500;
+    padding: 12px 14px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    border-radius: 8px;
+  }
+  .form-input::placeholder { color: var(--muted); }
+  .form-input:focus {
+    border-color: var(--red-edge);
+    box-shadow: 0 0 0 3px rgba(255,77,95,0.1);
+  }
   select.form-input { cursor: pointer; }
 
   .modal-msg {
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .5px;
-    padding: 10px 14px; margin-bottom: 16px; display: none;
-    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.3px;
+    padding: 11px 14px;
+    margin-bottom: 16px;
+    display: none;
+    border-radius: 8px;
   }
-  .modal-msg.error   { background: rgba(230,57,70,.1);   color: #ff8088; border: 1px solid rgba(230,57,70,.3); display: block; }
-  .modal-msg.success { background: rgba(46,194,126,.1);  color: #5dffa7; border: 1px solid rgba(46,194,126,.3); display: block; }
-  .modal-msg.info    { background: rgba(233,196,106,.1); color: var(--gold); border: 1px solid rgba(233,196,106,.3); display: block; }
+  .modal-msg.error   { background: rgba(255,77,95,0.08);   color: #ff8088;  border: 1px solid rgba(255,77,95,0.25); display: block; }
+  .modal-msg.success { background: rgba(46,194,126,0.08);  color: #5dffa7;  border: 1px solid rgba(46,194,126,0.3); display: block; }
+  .modal-msg.info    { background: rgba(245,197,66,0.08);  color: var(--gold); border: 1px solid rgba(245,197,66,0.25); display: block; }
 
   .btn-primary {
-    width: 100%; background: var(--red); color: #fff;
-    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 1px;
-    padding: 11px; border: none; cursor: pointer; transition: opacity .15s;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    width: 100%;
+    background: var(--red);
+    color: #fff;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600; font-size: 14px;
+    letter-spacing: 0.3px;
+    padding: 12px;
+    border: none;
+    cursor: pointer;
+    transition: all .15s;
+    border-radius: 8px;
+    text-transform: uppercase;
     margin-top: 4px;
+    box-shadow: 0 4px 16px var(--red-glow);
   }
-  .btn-primary:hover { opacity: .85; }
-  .btn-primary.purple { background: var(--purple); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--red-glow); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary.purple { background: var(--purple); box-shadow: 0 4px 16px rgba(179,155,255,0.35); }
+  .btn-primary.purple:hover { box-shadow: 0 6px 20px rgba(179,155,255,0.4); }
+
   .btn-ghost {
-    width: 100%; background: transparent; color: var(--dim);
-    font-family: 'Rajdhani', sans-serif; font-size: 13px;
-    padding: 9px; border: 1px solid var(--border); cursor: pointer; transition: .15s; margin-top: 8px;
-    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    width: 100%;
+    background: transparent;
+    color: var(--dim);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 500;
+    padding: 10px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: .15s;
+    margin-top: 10px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
   }
-  .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+  .btn-ghost:hover { border-color: var(--border-strong); color: var(--text); background: rgba(255,255,255,0.02); }
 
   /* Sign toggle */
-  .sign-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .sign-row { display: flex; gap: 10px; margin-bottom: 18px; }
   .sign-btn {
-    flex: 1; padding: 9px; border: 1px solid var(--border); background: transparent;
-    color: var(--dim); font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 14px;
-    letter-spacing: 1px; cursor: pointer; transition: .15s;
-    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    flex: 1;
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--dim);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600; font-size: 13px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: .15s;
+    border-radius: 8px;
+    text-transform: uppercase;
   }
-  .sign-btn.plus.active  { border-color: var(--green); background: rgba(46,194,126,.1); color: var(--green); }
-  .sign-btn.minus.active { border-color: var(--red);   background: rgba(230,57,70,.1);  color: var(--red); }
+  .sign-btn.plus.active  { border-color: rgba(46,194,126,0.4); background: rgba(46,194,126,0.08); color: var(--green); }
+  .sign-btn.minus.active { border-color: var(--red-edge); background: var(--red-soft); color: var(--red); }
 
-  .edit-target { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--white); letter-spacing: 1px; margin-bottom: 20px; }
+  .edit-target {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600; font-size: 16px;
+    color: var(--white);
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
   .edit-target span { color: var(--gold); }
 
   /* ── Admin panel styles ── */
   .admin-section-title {
-    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 2px;
-    text-transform: uppercase; color: var(--muted); margin-bottom: 12px; margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted);
+    margin-bottom: 12px; margin-top: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .admin-section-title::before {
+    content: ''; width: 4px; height: 4px;
+    background: var(--purple); border-radius: 50%;
   }
 
-  .pending-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+  .pending-list { display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
   .pending-list::-webkit-scrollbar { width: 4px; }
-  .pending-list::-webkit-scrollbar-track { background: var(--surface); }
-  .pending-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .pending-list::-webkit-scrollbar-track { background: transparent; }
+  .pending-list::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
 
   .pending-item {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--surface); border: 1px solid var(--border); padding: 10px 14px;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    border-radius: 10px;
+    transition: border-color .15s;
   }
-  .pending-login { flex: 1; font-weight: 700; color: var(--white); font-size: 14px; }
-  .pending-date { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); }
+  .pending-item:hover { border-color: var(--border-mid); }
+  .pending-info { flex: 1; min-width: 0; }
+  .pending-login { font-weight: 600; color: var(--white); font-size: 14px; }
+  .pending-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--muted);
+    margin-top: 2px;
+  }
   .pending-actions { display: flex; gap: 6px; }
   .pend-btn {
-    padding: 5px 12px; border: 1px solid; font-family: 'Rajdhani', sans-serif;
-    font-weight: 700; font-size: 12px; letter-spacing: .5px; cursor: pointer; transition: .15s;
-    clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+    padding: 6px 12px;
+    border: 1px solid;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600; font-size: 11px;
+    letter-spacing: 0.3px;
+    cursor: pointer; transition: .15s;
+    border-radius: 7px;
     background: transparent;
+    text-transform: uppercase;
   }
-  .pend-btn.approve { border-color: var(--green); color: var(--green); }
-  .pend-btn.approve:hover { background: rgba(46,194,126,.15); }
-  .pend-btn.reject { border-color: var(--red); color: var(--red); }
-  .pend-btn.reject:hover { background: rgba(230,57,70,.15); }
+  .pend-btn.approve { border-color: rgba(46,194,126,0.4); color: var(--green); }
+  .pend-btn.approve:hover { background: rgba(46,194,126,0.12); }
+  .pend-btn.reject { border-color: var(--red-edge); color: var(--red); }
+  .pend-btn.reject:hover { background: var(--red-soft); }
 
   .empty-state {
-    text-align: center; padding: 30px 20px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted);
+    text-align: center; padding: 28px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 0.5px;
   }
 
   /* tasks in admin panel */
-  .tasks-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; margin-bottom: 16px; }
+  .tasks-list { display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; margin-bottom: 16px; padding-right: 4px; }
   .tasks-list::-webkit-scrollbar { width: 4px; }
-  .tasks-list::-webkit-scrollbar-track { background: var(--surface); }
-  .tasks-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .tasks-list::-webkit-scrollbar-track { background: transparent; }
+  .tasks-list::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
 
   .task-item {
     display: flex; align-items: flex-start; gap: 10px;
-    background: var(--surface); border: 1px solid var(--border); padding: 10px 14px;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    border-radius: 10px;
+    transition: border-color .15s;
   }
+  .task-item:hover { border-color: var(--border-mid); }
   .task-info { flex: 1; min-width: 0; }
-  .task-title-admin { font-weight: 700; color: var(--white); font-size: 14px; margin-bottom: 2px; }
-  .task-meta { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); }
-  .task-del-btn {
-    background: none; border: 1px solid rgba(230,57,70,.3); color: var(--red);
-    width: 24px; height: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-    font-size: 12px; transition: .15s; flex-shrink: 0; margin-top: 2px;
-    clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+  .task-title-admin { font-weight: 600; color: var(--white); font-size: 14px; margin-bottom: 4px; }
+  .task-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; color: var(--muted);
+    letter-spacing: 0.3px;
   }
-  .task-del-btn:hover { background: rgba(230,57,70,.15); }
 
-  .form-row { display: flex; gap: 8px; }
+  .task-completors { margin-top: 8px; display: none; flex-wrap: wrap; gap: 4px; }
+  .task-completors.open { display: flex; }
+  .completor-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: rgba(46,194,126,0.1);
+    border: 1px solid rgba(46,194,126,0.25);
+    color: #5dffa7;
+    border-radius: 5px;
+    padding: 3px 8px;
+  }
+  .task-done-toggle {
+    display: inline-block; cursor: pointer;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #5dffa7;
+    border: 1px solid rgba(46,194,126,0.3);
+    border-radius: 5px;
+    padding: 2px 7px;
+    margin-left: 4px;
+    user-select: none;
+    transition: .15s;
+  }
+  .task-done-toggle:hover { background: rgba(46,194,126,0.1); }
+
+  .task-del-btn {
+    background: rgba(255,77,95,0.04);
+    border: 1px solid rgba(255,77,95,0.2);
+    color: var(--red);
+    width: 28px; height: 28px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    transition: .15s;
+    flex-shrink: 0;
+    border-radius: 6px;
+  }
+  .task-del-btn:hover { background: var(--red-soft); border-color: var(--red); }
+
+  .form-row { display: flex; gap: 10px; }
   .form-row .form-group { flex: 1; }
-  textarea.form-input { resize: vertical; min-height: 60px; font-size: 14px; }
+  textarea.form-input { resize: vertical; min-height: 70px; font-size: 14px; line-height: 1.5; }
+
+  /* logout button override */
+  .btn-ghost.danger { color: var(--red); border-color: rgba(255,77,95,0.25); }
+  .btn-ghost.danger:hover { background: var(--red-soft); border-color: var(--red); }
 </style>
 </head>
 <body>
@@ -382,13 +733,13 @@
       <div class="logo-icon" id="authIcon" onclick="handleAuthClick()" title="Авторизация">☠</div>
       <div>
         <h1>РЕЙТИНГ <span>РЕКРУТОВ</span></h1>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:4px;">INTERNAL · CLASSIFIED</div>
+        <div class="h-sub">INTERNAL · CLASSIFIED</div>
       </div>
     </div>
     <div class="meta">
       <span>ОБНОВЛЕНО: <strong id="updateTime">—</strong></span>
       <span>СЕЗОН: <strong id="season">—</strong></span>
-      <span>СЛЕДУЮЩЕЕ СПИСАНИЕ: <strong id="nextBurn">ПН 12:00</strong></span>
+      <span>СПИСАНИЕ: <strong id="nextBurn">ПН 12:00</strong></span>
       <span id="authMeta" style="color:var(--green);display:none"></span>
     </div>
   </header>
@@ -407,24 +758,20 @@
     <button class="filter-btn" onclick="setFilter('warning', this)">ПРЕДУПРЕЖДЕНИЕ</button>
     <button class="filter-btn" onclick="setFilter('danger', this)">ОПАСНОСТЬ</button>
     <button class="filter-btn curator-filter" onclick="setFilter('curator', this)">КУРАТОРЫ</button>
-    <!-- Admin button — shown only for admins -->
     <button class="filter-btn admin-btn" id="adminPanelBtn" style="display:none" onclick="openAdminPanel()">
       ⚙ АДМИН<span class="pending-badge" id="pendingBadge" style="display:none">0</span>
     </button>
-    <!-- ЛК рекрута — для админов -->
     <a href="/cabinet.html" class="filter-btn lk-btn" id="adminCabinetBtn" style="display:none;text-decoration:none">
       👤 ЛК РЕКРУТА
     </a>
-    <!-- Логи начислений — для админов -->
     <a href="/history.html" class="filter-btn history-btn" id="adminHistoryBtn" style="display:none;text-decoration:none">
       📜 ЛОГИ БАЛЛОВ
     </a>
-    <!-- Cabinet link — shown for recruits -->
     <a href="/cabinet.html" class="filter-btn cabinet-btn" id="cabinetBtn" style="display:none;text-decoration:none">
       📋 МОЙ КАБИНЕТ
     </a>
     <div class="spacer"></div>
-    <span class="update-info" id="refreshInfo">Обновление каждые 30с</span>
+    <span class="update-info" id="refreshInfo">Авто-обновление</span>
   </div>
 
   <div class="table-wrap">
@@ -476,7 +823,7 @@
 
 <!-- LOGGED IN MENU -->
 <div class="overlay" id="menuOverlay">
-  <div class="modal" style="max-width:320px">
+  <div class="modal" style="max-width:340px">
     <div class="modal-title" id="menuTitle">☠ ДОСТУП</div>
     <div class="modal-sub" id="menuSub">АВТОРИЗОВАН</div>
     <div class="modal-msg" id="menuMsg"></div>
@@ -489,7 +836,7 @@
       <input class="form-input" type="password" id="newPass" placeholder="Минимум 6 символов">
     </div>
     <button class="btn-primary" onclick="doChangePass()">СМЕНИТЬ ПАРОЛЬ</button>
-    <button class="btn-ghost" style="color:var(--red);border-color:rgba(230,57,70,.3)" onclick="doLogout()">ВЫЙТИ</button>
+    <button class="btn-ghost danger" onclick="doLogout()">ВЫЙТИ</button>
     <button class="btn-ghost" onclick="closeOverlay('menuOverlay')">ЗАКРЫТЬ</button>
   </div>
 </div>
@@ -525,7 +872,6 @@
       <button class="modal-tab purple-tab" onclick="switchAdminTab('tasks')">ЗАДАНИЯ</button>
     </div>
 
-    <!-- Pending approvals tab -->
     <div class="modal-form active" id="adminPendingForm">
       <div class="modal-msg" id="pendingMsg"></div>
       <div class="admin-section-title">ЗАЯВКИ НА РЕГИСТРАЦИЮ</div>
@@ -535,11 +881,9 @@
       <button class="btn-ghost" style="margin-top:16px" onclick="loadPending()">↻ ОБНОВИТЬ</button>
     </div>
 
-    <!-- Recruiters tab -->
     <div class="modal-form" id="adminRecruitersForm">
       <div class="modal-msg" id="recruitersAdminMsg"></div>
 
-      <!-- Добавить рекрута по Discord ID -->
       <div class="admin-section-title">ДОБАВИТЬ РЕКРУТА ПО DISCORD ID</div>
       <div class="form-group">
         <label class="form-label">Discord ID <span style="color:var(--muted);font-size:10px">(17–19 цифр)</span></label>
@@ -551,9 +895,8 @@
       </div>
       <button class="btn-primary purple" onclick="adminAddRecruiter()">+ ДОБАВИТЬ</button>
 
-      <!-- Список рекрутов -->
-      <div class="admin-section-title" style="margin-top:18px">СПИСОК РЕКРУТОВ
-        <span style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);margin-left:8px" id="recListCount"></span>
+      <div class="admin-section-title" style="margin-top:24px">СПИСОК РЕКРУТОВ
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-left:8px" id="recListCount"></span>
       </div>
       <div class="form-group">
         <input class="form-input" id="recSearch" placeholder="Поиск по имени..." oninput="filterRecruitersList()">
@@ -561,8 +904,7 @@
       <div id="adminRecruitersList"><div class="empty-state">Загрузка...</div></div>
     </div>
 
-    <!-- Rename modal inside admin panel -->
-    <div id="renameInline" style="display:none;margin-top:12px;padding:14px;background:var(--surface);border:1px solid var(--border)">
+    <div id="renameInline" style="display:none;margin-top:14px;padding:16px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px">
       <div class="modal-msg" id="renameMsg"></div>
       <div class="admin-section-title" id="renameTarget">ПЕРЕИМЕНОВАТЬ</div>
       <div class="form-group">
@@ -575,7 +917,6 @@
       </div>
     </div>
 
-    <!-- Tasks tab -->
     <div class="modal-form" id="adminTasksForm">
       <div class="modal-msg" id="tasksAdminMsg"></div>
       <div class="admin-section-title">СУЩЕСТВУЮЩИЕ ЗАДАНИЯ</div>
@@ -600,7 +941,7 @@
       <div class="form-group">
         <label class="form-label">⏰ Дедлайн (необязательно)</label>
         <input class="form-input" type="datetime-local" id="taskDeadline" />
-        <div style="font-size:11px;color:var(--muted,#6b7280);margin-top:4px">За 24 часа до дедлайна рекруты получат DM-уведомление</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;font-family:'JetBrains Mono',monospace">За 24 часа до дедлайна рекруты получат DM-уведомление</div>
       </div>
       <button class="btn-primary purple" onclick="createTask()">СОЗДАТЬ ЗАДАНИЕ</button>
     </div>
@@ -622,8 +963,6 @@ let editTargetId = null;
 
 const RANK_ORDER = { 'Стажёр': 0, 'Рекрут': 1, 'Агент': 2, 'Элита': 3, 'Куратор': 4 };
 const MEDALS = ['🥇','🥈','🥉'];
-
-// ── Data loading ──────────────────────────────────────────
 
 async function fetchData() {
   try {
@@ -657,8 +996,6 @@ function isCurator(r) {
   return r.isCurator || r.status === 'curator' || r.points >= 2000;
 }
 
-// ── Render ────────────────────────────────────────────────
-
 function setFilter(f, btn) {
   filter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -689,9 +1026,9 @@ function getFiltered() {
 }
 
 function bufferColor(pts) {
-  if (pts <= 5)  return '#e63946';
+  if (pts <= 5)  return '#ff4d5f';
   if (pts <= 10) return '#f4a261';
-  if (pts <= 20) return '#e9c46a';
+  if (pts <= 20) return '#f5c542';
   return '#2ec27e';
 }
 
@@ -722,7 +1059,7 @@ function render() {
     }
     const initials = (r.displayName || r.username || '?').slice(0, 2).toUpperCase();
     const pct = cur ? 100 : Math.min(100, (r.points / maxPts) * 100);
-    const bColor = cur ? '#a78bfa' : bufferColor(r.points);
+    const bColor = cur ? '#b39bff' : bufferColor(r.points);
     const weeks = Array.from({ length: 4 }, (_, i) => {
       const on = (r.weeklyActivity || [])[i];
       return `<div class="week-dot ${on ? 'on' : 'off'}"></div>`;
@@ -755,7 +1092,7 @@ function render() {
       <td class="hide-sm">
         <div class="buffer-wrap">
           <div class="buffer-text">${cur ? '∞' : r.points + ' / ' + maxPts}</div>
-          <div class="buffer-bar"><div class="buffer-fill" style="width:${pct}%;background:${bColor}"></div></div>
+          <div class="buffer-bar"><div class="buffer-fill" style="width:${pct}%;background:${bColor};color:${bColor}"></div></div>
         </div>
       </td>
       <td class="hide-sm"><div class="weeks">${cur ? '🛡🛡🛡🛡' : weeks}</div></td>
@@ -768,8 +1105,6 @@ function render() {
 function esc(str) {
   return String(str||'').replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 }
-
-// ── Auth ──────────────────────────────────────────────────
 
 function handleAuthClick() {
   if (authToken) {
@@ -805,11 +1140,9 @@ function updateAuthUI() {
     meta.style.display = '';
     document.getElementById('editCol').style.display = '';
 
-    // Show admin panel button only for admins
     adminBtn.style.display = isAdmin ? '' : 'none';
     adminCabinetBtn.style.display = isAdmin ? '' : 'none';
     adminHistoryBtn.style.display = isAdmin ? '' : 'none';
-    // Show cabinet button only for recruits
     cabinetBtn.style.display = isRecruiter ? '' : 'none';
 
     if (isAdmin) loadPendingCount();
@@ -884,8 +1217,6 @@ function doLogout() {
   updateAuthUI();
 }
 
-// ── Edit points ───────────────────────────────────────────
-
 function openEdit(id, name) {
   editTargetId = id; editSign = 1;
   document.getElementById('editTargetName').textContent = name;
@@ -917,8 +1248,6 @@ async function doEditPoints() {
   fetchData();
 }
 
-// ── Admin: управление рекрутами ───────────────────────────
-
 let adminRecList = [];
 let renameTargetId = null;
 
@@ -949,14 +1278,14 @@ function renderAdminRecruitersList() {
   const html = filtered.map(r => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:10px;flex-wrap:wrap">
       <div>
-        <span style="font-weight:700;font-size:15px;color:var(--white)">${esc(r.displayName)}</span>
-        <span style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);margin-left:8px">${r.discordId}</span>
+        <span style="font-weight:600;font-size:15px;color:var(--white)">${esc(r.displayName)}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-left:8px">${r.discordId}</span>
         <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statusColors[r.status]||'var(--muted)'};margin-left:8px"></span>
         <span style="font-size:12px;color:var(--muted)">💎 ${r.points}</span>
       </div>
       <div style="display:flex;gap:6px">
-        <button class="btn-ghost" style="padding:5px 12px;font-size:11px" onclick="openRename('${r.discordId}','${esc(r.displayName)}')">✏ ИМЯ</button>
-        <button class="btn-ghost" style="padding:5px 12px;font-size:11px;color:var(--red)" onclick="openEdit('${r.discordId}','${esc(r.displayName)}')">💎 БАЛЛЫ</button>
+        <button class="btn-ghost" style="padding:6px 12px;font-size:11px;width:auto;margin:0" onclick="openRename('${r.discordId}','${esc(r.displayName)}')">✏ ИМЯ</button>
+        <button class="btn-ghost danger" style="padding:6px 12px;font-size:11px;width:auto;margin:0" onclick="openEdit('${r.discordId}','${esc(r.displayName)}')">💎 БАЛЛЫ</button>
       </div>
     </div>`).join('');
   document.getElementById('adminRecruitersList').innerHTML = html;
@@ -1010,8 +1339,6 @@ async function doRename() {
   loadAdminRecruitersList();
   fetchData();
 }
-
-
 
 let adminTabActive = 'pending';
 
@@ -1114,8 +1441,6 @@ async function rejectUser(login) {
   }
 }
 
-// ── Admin tasks ───────────────────────────────────────────
-
 async function loadAdminTasks() {
   const list = document.getElementById('adminTasksList');
   list.innerHTML = '<div class="empty-state">Загрузка...</div>';
@@ -1127,7 +1452,6 @@ async function loadAdminTasks() {
       return;
     }
 
-    // Карта discordId → displayName из уже загруженного лидерборда
     const nameMap = {};
     (allData || []).forEach(rec => { nameMap[rec.discordId] = rec.displayName || rec.username || rec.discordId; });
 
@@ -1143,12 +1467,12 @@ async function loadAdminTasks() {
           <div class="task-title-admin">${esc(t.title)}</div>
           <div class="task-meta">
             ${t.assignedTo === 'all' ? '👥 Все рекруты' : '👤 ' + esc(t.assignedTo)} ·
-            <span style="color:${count > 0 ? '#2ecc71' : 'var(--muted)'}">Выполнили: ${count}</span>${count > 0 ? ` <span class="task-done-toggle" onclick="toggleCompletors('${tid}')">▾ показать</span>` : ''} ·
+            <span style="color:${count > 0 ? '#5dffa7' : 'var(--muted)'}">Выполнили: ${count}</span>${count > 0 ? ` <span class="task-done-toggle" onclick="toggleCompletors('${tid}')">▾ показать</span>` : ''} ·
             ${new Date(t.createdAt).toLocaleDateString('ru')}
-            ${t.deadline ? (() => { const dl = new Date(t.deadline); const h = Math.round((dl - Date.now())/36e5); const c = h <= 6 ? '#ef4444' : h <= 24 ? '#f59e0b' : '#60a5fa'; return ` · <span style="color:${c}">⏰ Дедлайн: ${dl.toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} (~${h}ч.)</span>`; })() : ''}
+            ${t.deadline ? (() => { const dl = new Date(t.deadline); const h = Math.round((dl - Date.now())/36e5); const c = h <= 6 ? '#ff4d5f' : h <= 24 ? '#f4a261' : '#7dadff'; return ` · <span style="color:${c}">⏰ Дедлайн: ${dl.toLocaleString('ru',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} (~${h}ч.)</span>`; })() : ''}
           </div>
           ${count > 0 ? `<div class="task-completors" id="${tid}">${tags}</div>` : ''}
-          ${t.description ? `<div class="task-meta" style="margin-top:4px;color:var(--dim)">${esc(t.description)}</div>` : ''}
+          ${t.description ? `<div class="task-meta" style="margin-top:6px;color:var(--dim)">${esc(t.description)}</div>` : ''}
         </div>
         <button class="task-del-btn" onclick="deleteTask('${t.id}')" title="Удалить">✕</button>
       </div>`;
@@ -1219,8 +1543,6 @@ async function deleteTask(id) {
   }
 }
 
-// ── Utils ─────────────────────────────────────────────────
-
 document.querySelectorAll('.overlay').forEach(o=>{
   o.addEventListener('click', e=>{ if(e.target===o) closeOverlay(o.id); });
 });
@@ -1233,7 +1555,6 @@ document.addEventListener('keydown', e=>{
   if(document.getElementById('editOverlay').classList.contains('open')) doEditPoints();
 });
 
-// Verify token on load
 if (authToken) {
   fetch('/api/auth/me',{headers:{'x-token':authToken}})
     .then(r=>r.ok?r.json():null)
@@ -1248,7 +1569,6 @@ if (authToken) {
 
 fetchData();
 setInterval(fetchData, 30000);
-// Refresh pending count every 60s for admins
 setInterval(()=>{ if(authUser?.role==='admin') loadPendingCount(); }, 60000);
 </script>
 </body>

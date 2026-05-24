@@ -6,176 +6,388 @@
 <title>Личный Кабинет Рекрута</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:       #050508;
-    --surface:  #0d0d14;
-    --card:     #11111a;
-    --border:   #1e1e2e;
-    --red:      #e63946;
-    --gold:     #e9c46a;
-    --amber:    #f4a261;
-    --green:    #2ec27e;
-    --purple:   #a78bfa;
-    --blue:     #60a5fa;
-    --muted:    #555570;
-    --text:     #d8d8e8;
-    --dim:      #888899;
-    --white:    #f0f0fa;
+    --bg:           #050507;
+    --bg-elevated:  #0a0a0e;
+    --surface:      #0f0f15;
+    --card:         #12121b;
+    --border:       #1a1a22;
+    --border-mid:   #25252e;
+    --border-strong:#35353f;
+
+    --red:          #ff4d5f;
+    --gold:         #f5c542;
+    --amber:        #f4a261;
+    --green:        #2ec27e;
+    --purple:       #b39bff;
+    --blue:         #7dadff;
+    --blue-soft:    rgba(125,173,255,0.08);
+    --blue-edge:    rgba(125,173,255,0.3);
+    --blue-glow:    rgba(125,173,255,0.4);
+
+    --text:         #e8e8f0;
+    --white:        #f5f5fa;
+    --dim:          #888899;
+    --muted:        #5a5a6a;
   }
 
   html { scroll-behavior: smooth; }
   body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Rajdhani', sans-serif; min-height: 100vh; overflow-x: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.005em;
   }
   body::before {
-    content: ''; position: fixed; inset: 0;
+    content: '';
+    position: fixed; inset: 0;
     background-image:
-      linear-gradient(rgba(96,165,250,.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(96,165,250,.03) 1px, transparent 1px);
-    background-size: 40px 40px; pointer-events: none; z-index: 0;
+      linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black 40%, transparent 90%);
+    pointer-events: none; z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(circle at 20% 0%, var(--blue-soft), transparent 50%),
+      radial-gradient(circle at 80% 100%, rgba(125,173,255,0.04), transparent 50%);
+    pointer-events: none; z-index: 0;
   }
 
-  .wrap { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 0 20px 60px; }
+  .wrap { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 0 24px 80px; }
 
   /* ── Header ── */
   header {
-    padding: 40px 0 32px; display: flex; align-items: flex-end; justify-content: space-between;
-    gap: 20px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 36px;
+    padding: 48px 0 32px;
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 24px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 36px;
     animation: fadeDown .6s ease both;
   }
-  .logo { display: flex; align-items: flex-end; gap: 16px; }
+  .logo { display: flex; align-items: center; gap: 18px; }
   .logo-icon {
-    width: 48px; height: 48px; background: var(--blue);
-    display: grid; place-items: center; font-size: 22px;
-    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--blue) 0%, #5a8dd9 100%);
+    display: grid; place-items: center;
+    font-size: 22px;
+    border-radius: 10px;
+    box-shadow:
+      0 4px 24px var(--blue-glow),
+      0 0 0 1px rgba(255,255,255,0.06) inset;
   }
-  h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(26px, 5vw, 42px); letter-spacing: 3px; line-height: 1; color: var(--white); }
+  h1 {
+    font-weight: 700;
+    font-size: clamp(26px, 4.5vw, 38px);
+    letter-spacing: -0.025em;
+    line-height: 1;
+    color: var(--white);
+  }
   h1 span { color: var(--blue); }
+  .h-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    margin-top: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .h-sub::before {
+    content: ''; width: 6px; height: 6px; background: var(--blue);
+    border-radius: 50%; box-shadow: 0 0 6px var(--blue-glow);
+  }
 
   .nav-link {
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--muted);
-    letter-spacing: 1px; text-transform: uppercase; text-decoration: none;
-    border: 1px solid var(--border); padding: 8px 16px; transition: .2s;
-    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; color: var(--muted);
+    letter-spacing: 1.5px; text-transform: uppercase;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    padding: 10px 16px;
+    transition: .2s;
+    border-radius: 8px;
   }
-  .nav-link:hover { border-color: var(--blue); color: var(--blue); }
+  .nav-link:hover { border-color: var(--blue-edge); color: var(--blue); background: var(--blue-soft); }
 
   /* ── Auth wall ── */
   .auth-wall {
-    text-align: center; padding: 100px 20px;
+    text-align: center;
+    padding: 100px 20px;
     display: none;
   }
-  .auth-wall .icon { font-size: 56px; margin-bottom: 20px; }
-  .auth-wall h2 { font-family: 'Bebas Neue', sans-serif; font-size: 32px; letter-spacing: 3px; color: var(--white); margin-bottom: 10px; }
-  .auth-wall p { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+  .auth-wall .icon { font-size: 64px; margin-bottom: 24px; opacity: .8; }
+  .auth-wall h2 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 30px;
+    color: var(--white);
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+  .auth-wall p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-bottom: 28px;
+    text-transform: uppercase;
+  }
 
   /* ── Profile card ── */
   .profile-card {
-    background: var(--card); border: 1px solid rgba(96,165,250,.2);
-    padding: 24px 28px; margin-bottom: 32px;
-    clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+    background:
+      radial-gradient(circle at 0% 0%, rgba(125,173,255,0.06), transparent 60%),
+      var(--card);
+    border: 1px solid var(--border);
+    padding: 28px 30px;
+    margin-bottom: 32px;
+    border-radius: 14px;
     animation: fadeUp .5s .1s ease both;
-    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    position: relative;
+    overflow: hidden;
   }
+  .profile-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(125,173,255,0.3), transparent);
+  }
+
   .profile-avatar {
-    width: 64px; height: 64px; background: var(--surface); border: 2px solid var(--blue);
-    display: grid; place-items: center; font-size: 24px;
-    font-family: 'IBM Plex Mono', monospace; font-weight: 500; color: var(--blue); flex-shrink: 0;
-    clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+    width: 68px; height: 68px;
+    background: linear-gradient(135deg, var(--blue) 0%, #5a8dd9 100%);
+    display: grid; place-items: center;
+    font-size: 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: #fff;
+    flex-shrink: 0;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px var(--blue-glow), 0 0 0 1px rgba(255,255,255,0.06) inset;
   }
-  .profile-info { flex: 1; }
-  .profile-login { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--white); }
+
+  .profile-info { flex: 1; min-width: 0; }
+  .profile-login {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    color: var(--white);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
   .profile-role {
     display: inline-flex; align-items: center; gap: 6px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 1px;
-    color: var(--blue); border: 1px solid rgba(96,165,250,.3); padding: 3px 10px; margin-top: 4px;
-    clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.2px;
+    color: var(--blue);
+    border: 1px solid var(--blue-edge);
+    background: var(--blue-soft);
+    padding: 4px 10px;
+    margin-top: 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
   }
-  .profile-stats { display: flex; gap: 24px; flex-wrap: wrap; }
+
+  .profile-stats { display: flex; gap: 28px; flex-wrap: wrap; }
   .p-stat { text-align: center; }
-  .p-stat-value { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; }
-  .p-stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
-  .p-stat-value.blue { color: var(--blue); }
-  .p-stat-value.green { color: var(--green); }
+  .p-stat-value {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 30px;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+  .p-stat-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+  .p-stat-value.blue { color: var(--blue); text-shadow: 0 0 24px rgba(125,173,255,0.3); }
+  .p-stat-value.green { color: var(--green); text-shadow: 0 0 24px rgba(46,194,126,0.25); }
 
   /* ── Progress bar ── */
-  .progress-bar-wrap { margin-top: 12px; }
-  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
-  .progress-fill { height: 100%; background: var(--blue); border-radius: 2px; transition: width .6s ease; }
-  .progress-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); margin-top: 4px; }
+  .progress-bar-wrap { margin-top: 14px; width: 100%; }
+  .progress-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--blue), #5a8dd9);
+    border-radius: 99px;
+    transition: width .6s ease;
+    box-shadow: 0 0 8px var(--blue-glow);
+  }
+  .progress-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 6px;
+    letter-spacing: 0.5px;
+  }
 
   /* ── Section header ── */
   .section-header {
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px; animation: fadeUp .5s .2s ease both;
+    margin-bottom: 16px;
+    animation: fadeUp .5s .2s ease both;
   }
   .section-title {
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 2px;
-    text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--dim);
+    display: flex; align-items: center; gap: 10px;
   }
-  .section-title::before { content: ''; display: block; width: 3px; height: 14px; background: var(--blue); }
+  .section-title::before {
+    content: '';
+    display: block;
+    width: 3px; height: 14px;
+    background: var(--blue);
+    border-radius: 2px;
+    box-shadow: 0 0 6px var(--blue-glow);
+  }
   .section-count {
-    font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.5px;
   }
 
   /* ── Task filters ── */
   .task-filters { display: flex; gap: 8px; margin-bottom: 20px; animation: fadeUp .5s .25s ease both; }
   .tfilter {
-    background: transparent; border: 1px solid var(--border); color: var(--dim);
-    font-family: 'Rajdhani', sans-serif; font-weight: 600; font-size: 12px; letter-spacing: 1px;
-    padding: 6px 14px; cursor: pointer; transition: .2s;
-    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: .18s;
+    border-radius: 8px;
+    text-transform: uppercase;
   }
-  .tfilter.active, .tfilter:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .tfilter.done.active, .tfilter.done:hover { background: var(--green); border-color: var(--green); }
+  .tfilter:hover { border-color: var(--border-strong); color: var(--text); background: rgba(255,255,255,0.02); }
+  .tfilter.active {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+    box-shadow: 0 4px 16px var(--blue-glow);
+  }
+  .tfilter.done.active { background: var(--green); border-color: var(--green); box-shadow: 0 4px 16px rgba(46,194,126,0.35); }
 
   /* ── Tasks list ── */
   .tasks-container { animation: fadeUp .5s .3s ease both; }
 
   .task-card {
-    background: var(--card); border: 1px solid var(--border);
-    padding: 18px 20px; margin-bottom: 10px; transition: border-color .2s, background .2s;
-    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
-    display: flex; align-items: flex-start; gap: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 18px 22px;
+    margin-bottom: 10px;
+    transition: border-color .2s, background .2s, transform .15s;
+    border-radius: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
     animation: fadeRow .4s ease both;
   }
-  .task-card:hover { border-color: rgba(96,165,250,.25); }
-  .task-card.completed { border-color: rgba(46,194,126,.2); background: rgba(46,194,126,.03); }
-  .task-card.completed:hover { border-color: rgba(46,194,126,.35); }
+  .task-card:hover {
+    border-color: var(--blue-edge);
+    transform: translateY(-1px);
+  }
+  .task-card.completed {
+    border-color: rgba(46,194,126,0.2);
+    background: rgba(46,194,126,0.03);
+  }
+  .task-card.completed:hover { border-color: rgba(46,194,126,0.4); }
 
   .task-check {
-    width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 3px;
-    cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-    transition: all .2s; margin-top: 2px; font-size: 13px;
+    width: 26px; height: 26px;
+    border: 2px solid var(--border-mid);
+    border-radius: 7px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .2s;
+    margin-top: 2px;
+    font-size: 14px;
+    font-weight: 700;
   }
-  .task-check:hover { border-color: var(--blue); }
-  .task-card.completed .task-check { border-color: var(--green); background: rgba(46,194,126,.15); color: var(--green); }
+  .task-check:hover {
+    border-color: var(--blue);
+    background: var(--blue-soft);
+  }
+  .task-card.completed .task-check {
+    border-color: var(--green);
+    background: rgba(46,194,126,0.15);
+    color: var(--green);
+    box-shadow: 0 0 8px rgba(46,194,126,0.3);
+  }
 
   .task-body { flex: 1; min-width: 0; }
   .task-title {
-    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 17px;
-    color: var(--white); margin-bottom: 4px; line-height: 1.3;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--white);
+    margin-bottom: 6px;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
   }
   .task-card.completed .task-title { color: var(--dim); text-decoration: line-through; }
-  .task-desc { font-size: 13px; color: var(--dim); margin-bottom: 8px; line-height: 1.4; }
-  .task-footer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .task-desc {
+    font-size: 14px;
+    color: var(--dim);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .task-footer {
+    display: flex; align-items: center; gap: 10px;
+    flex-wrap: wrap;
+  }
   .task-badge {
     display: inline-flex; align-items: center; gap: 4px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 1px;
-    padding: 2px 8px; border: 1px solid;
-    clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.8px;
+    padding: 3px 9px;
+    border: 1px solid;
+    border-radius: 5px;
+    text-transform: uppercase;
   }
-  .task-badge.all { color: var(--purple); border-color: rgba(167,139,250,.3); }
-  .task-badge.personal { color: var(--blue); border-color: rgba(96,165,250,.3); }
-  .task-badge.done-badge { color: var(--green); border-color: rgba(46,194,126,.3); }
-  .task-date { font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: var(--muted); }
+  .task-badge.all { color: var(--purple); border-color: rgba(179,155,255,0.3); background: rgba(179,155,255,0.05); }
+  .task-badge.personal { color: var(--blue); border-color: var(--blue-edge); background: var(--blue-soft); }
+  .task-badge.done-badge { color: var(--green); border-color: rgba(46,194,126,0.3); background: rgba(46,194,126,0.05); }
+  .task-date {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.3px;
+  }
 
-  /* Complete animation */
   @keyframes checkPop {
     0% { transform: scale(1); }
     50% { transform: scale(1.3); }
@@ -185,91 +397,146 @@
 
   /* ── Empty state ── */
   .empty-tasks {
-    text-align: center; padding: 60px 20px; color: var(--muted);
-    font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
   }
-  .empty-tasks .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-tasks .icon { font-size: 44px; margin-bottom: 14px; opacity: .8; }
 
   /* ── Toast ── */
   .toast {
-    position: fixed; bottom: 28px; right: 28px;
-    background: var(--card); border: 1px solid var(--border); padding: 12px 18px;
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: .5px;
-    z-index: 999; opacity: 0; transform: translateY(10px); transition: all .25s;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    position: fixed;
+    bottom: 28px; right: 28px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 14px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all .25s;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
   }
   .toast.show { opacity: 1; transform: none; }
-  .toast.green { border-color: rgba(46,194,126,.4); color: var(--green); }
-  .toast.blue  { border-color: rgba(96,165,250,.4); color: var(--blue); }
+  .toast.green { border-color: rgba(46,194,126,0.4); color: var(--green); box-shadow: 0 12px 32px rgba(46,194,126,0.2); }
+  .toast.blue  { border-color: var(--blue-edge); color: var(--blue); box-shadow: 0 12px 32px rgba(125,173,255,0.2); }
 
+  /* ── Buttons ── */
   .btn-primary {
-    display: inline-block; background: var(--blue); color: #fff;
-    font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 14px; letter-spacing: 1px;
-    padding: 10px 24px; border: none; cursor: pointer; transition: opacity .15s; text-decoration: none;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--blue);
+    color: #fff;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.3px;
+    padding: 11px 22px;
+    border: none;
+    cursor: pointer;
+    transition: all .15s;
+    text-decoration: none;
+    border-radius: 8px;
+    text-transform: uppercase;
+    box-shadow: 0 4px 16px var(--blue-glow);
   }
-  .btn-primary:hover { opacity: .85; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px var(--blue-glow); }
+  .btn-primary:active { transform: translateY(0); }
 
-  @keyframes fadeDown { from { opacity:0; transform: translateY(-20px); } to { opacity:1; transform: none; } }
-  @keyframes fadeUp   { from { opacity:0; transform: translateY(16px);  } to { opacity:1; transform: none; } }
-  @keyframes fadeRow  { from { opacity:0; transform: translateX(-10px); } to { opacity:1; transform: none; } }
+  .btn-ghost {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent;
+    color: var(--dim);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    padding: 9px 16px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: .2s;
+    border-radius: 8px;
+    text-transform: uppercase;
+  }
+  .btn-ghost:hover {
+    border-color: rgba(255,77,95,0.3);
+    color: var(--red);
+    background: rgba(255,77,95,0.06);
+  }
 
-  /* ── Discord form ── */
+  /* ── Form ── */
   .form-group { margin-bottom: 14px; }
-
   .form-label {
     display: block;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
-    color: var(--dim); margin-bottom: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
   }
-
   .form-input {
-    width: 100%; background: var(--surface);
-    border: 1px solid var(--border); color: var(--white);
-    font-family: 'IBM Plex Mono', monospace; font-size: 13px;
-    padding: 11px 14px; outline: none; transition: border-color .2s, box-shadow .2s;
-    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    width: 100%;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--white);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 11px 14px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    border-radius: 8px;
   }
   .form-input::placeholder { color: var(--muted); }
   .form-input:focus {
-    border-color: rgba(96,165,250,.6);
-    box-shadow: 0 0 0 3px rgba(96,165,250,.08), inset 0 0 12px rgba(96,165,250,.04);
+    border-color: var(--blue-edge);
+    box-shadow: 0 0 0 3px rgba(125,173,255,0.1);
   }
-  .form-input:focus::placeholder { color: var(--border); }
 
-  /* ── Ghost button (for unlink etc.) ── */
-  .btn-ghost {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: transparent; color: var(--dim);
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
-    letter-spacing: 1px; text-transform: uppercase;
-    padding: 8px 16px; border: 1px solid var(--border);
-    cursor: pointer; transition: .2s;
-    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
-  }
-  .btn-ghost:hover { border-color: var(--red); color: var(--red); background: rgba(230,57,70,.06); }
-
-  /* ── Modal message (inline feedback) ── */
   .modal-msg {
-    font-family: 'IBM Plex Mono', monospace; font-size: 10px;
-    letter-spacing: 1px; text-transform: uppercase;
-    min-height: 18px; margin-bottom: 12px; transition: color .2s;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    min-height: 18px;
+    margin-bottom: 12px;
+    transition: color .2s;
   }
   .modal-msg.error { color: var(--red); }
   .modal-msg.success { color: var(--green); }
 
   /* ── Discord linked block ── */
   .discord-id-display {
-    font-family: 'IBM Plex Mono', monospace; font-size: 15px;
-    color: var(--green); letter-spacing: 1px;
-    background: rgba(46,194,126,.07); border: 1px solid rgba(46,194,126,.2);
-    padding: 10px 14px; margin-top: 6px; display: inline-block;
-    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    color: var(--green);
+    letter-spacing: 1px;
+    background: rgba(46,194,126,0.08);
+    border: 1px solid rgba(46,194,126,0.25);
+    padding: 10px 14px;
+    margin-top: 8px;
+    display: inline-block;
+    border-radius: 8px;
+    font-weight: 600;
   }
 
-  /* ── Btn primary: ensure icon + text align ── */
-  .btn-primary { display: inline-flex; align-items: center; gap: 8px; }
+  @keyframes fadeDown { from { opacity:0; transform: translateY(-20px); } to { opacity:1; transform: none; } }
+  @keyframes fadeUp   { from { opacity:0; transform: translateY(16px);  } to { opacity:1; transform: none; } }
+  @keyframes fadeRow  { from { opacity:0; transform: translateX(-10px); } to { opacity:1; transform: none; } }
+
+  @media (max-width: 680px) {
+    .profile-card { padding: 20px; }
+    .profile-stats { gap: 18px; width: 100%; justify-content: space-around; }
+    header { padding: 32px 0 24px; }
+  }
 </style>
 </head>
 <body>
@@ -280,24 +547,21 @@
       <div class="logo-icon">📋</div>
       <div>
         <h1>ЛИЧНЫЙ <span>КАБИНЕТ</span></h1>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:2px;margin-top:4px;">RECRUITER PORTAL</div>
+        <div class="h-sub">RECRUITER PORTAL</div>
       </div>
     </div>
     <a href="/" class="nav-link">← РЕЙТИНГ</a>
   </header>
 
-  <!-- Auth wall -->
   <div class="auth-wall" id="authWall">
     <div class="icon">🔒</div>
     <h2>ДОСТУП ЗАКРЫТ</h2>
-    <p>ВОЙДИ В СИСТЕМУ КАК РЕКРУТ ДЛЯ ДОСТУПА К КАБИНЕТУ</p>
-    <a href="/" class="btn-primary">← ВЕРНУТЬСЯ НА ГЛАВНУЮ</a>
+    <p>Войди в систему как рекрут для доступа к кабинету</p>
+    <a href="/" class="btn-primary">← Вернуться на главную</a>
   </div>
 
-  <!-- Cabinet content -->
   <div id="cabinetContent" style="display:none">
 
-    <!-- Profile card -->
     <div class="profile-card" id="profileCard">
       <div class="profile-avatar" id="profileAvatar">?</div>
       <div class="profile-info">
@@ -324,65 +588,60 @@
       </div>
     </div>
 
-    <!-- Discord привязка -->
     <div class="section-header" style="margin-top:28px">
       <div class="section-title">🔗 ПРИВЯЗКА DISCORD</div>
     </div>
-    <div id="discordLinkBlock" style="background:var(--card);border:1px solid var(--border);padding:20px 22px;margin-bottom:24px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))">
+    <div id="discordLinkBlock" style="background:var(--card);border:1px solid var(--border);padding:22px 24px;margin-bottom:28px;border-radius:14px">
       <div id="discordLinked" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
           <div>
-            <div style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">✅ Привязанный Discord ID</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px">✅ Привязанный Discord ID</div>
             <div class="discord-id-display" id="discordIdDisplay">—</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:10px">Команды <b style="color:var(--blue)">/задания</b> и <b style="color:var(--blue)">/привязать</b> в Discord работают</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:12px;font-family:'JetBrains Mono',monospace">Команды <b style="color:var(--blue)">/задания</b> и <b style="color:var(--blue)">/привязать</b> в Discord работают</div>
           </div>
           <button class="btn-ghost" onclick="unlinkDiscord()">✕ ОТВЯЗАТЬ</button>
         </div>
       </div>
       <div id="discordUnlinked">
-        <!-- Привязка через одноразовый код (рекомендуется) -->
-        <div style="background:rgba(88,166,255,0.07);border:1px solid rgba(88,166,255,0.25);padding:16px 18px;margin-bottom:18px;clip-path:polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))">
-          <div style="font-size:12px;color:var(--blue);letter-spacing:1.2px;text-transform:uppercase;font-family:'IBM Plex Mono';margin-bottom:10px">✨ Быстрая привязка через бот</div>
-          <div style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px">
+        <div style="background:var(--blue-soft);border:1px solid var(--blue-edge);padding:18px 20px;margin-bottom:18px;border-radius:10px">
+          <div style="font-size:11px;color:var(--blue);letter-spacing:1.5px;text-transform:uppercase;font-family:'JetBrains Mono',monospace;margin-bottom:12px;font-weight:600">✨ Быстрая привязка через бот</div>
+          <div style="font-size:13px;color:var(--dim);line-height:1.7;margin-bottom:16px">
             1. Напиши <b style="color:var(--blue)">/привязать</b> в Discord-боте<br>
-            2. Скопируй полученный <b>6-значный код</b><br>
+            2. Скопируй полученный <b style="color:var(--white)">6-значный код</b><br>
             3. Вставь его ниже и нажми «Привязать»
           </div>
-          <div class="form-group" style="margin-bottom:12px">
-            <label class="form-label">Код из бота <span style="color:var(--muted);font-weight:400">(6 цифр, действует 5 мин)</span></label>
-            <input class="form-input" id="discordCodeInput" placeholder="123456" maxlength="6" type="text" inputmode="numeric" style="font-family:'IBM Plex Mono';font-size:22px;letter-spacing:4px;text-align:center">
+          <div class="form-group" style="margin-bottom:14px">
+            <label class="form-label">Код из бота <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">(6 цифр, действует 5 мин)</span></label>
+            <input class="form-input" id="discordCodeInput" placeholder="123456" maxlength="6" type="text" inputmode="numeric" style="font-family:'JetBrains Mono',monospace;font-size:22px;letter-spacing:6px;text-align:center;font-weight:600">
           </div>
           <div class="modal-msg" id="discordLinkMsg"></div>
           <button class="btn-primary" onclick="linkDiscordByCode()">🔗 ПРИВЯЗАТЬ</button>
         </div>
 
-        <!-- Резервный вариант: ручной ввод ID -->
-        <details style="margin-top:6px">
-          <summary style="font-size:12px;color:var(--muted);cursor:pointer;user-select:none">Альтернатива: ввести Discord ID вручную</summary>
-          <div style="padding-top:14px">
-            <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Свой Discord ID можно узнать в настройках Discord → «Расширенные» → «Режим разработчика», затем ПКМ на своём нике.</div>
+        <details style="margin-top:8px">
+          <summary style="font-size:12px;color:var(--muted);cursor:pointer;user-select:none;font-family:'JetBrains Mono',monospace;letter-spacing:0.5px">▸ Альтернатива: ввести Discord ID вручную</summary>
+          <div style="padding-top:16px">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6">Свой Discord ID можно узнать в настройках Discord → «Расширенные» → «Режим разработчика», затем ПКМ на своём нике.</div>
             <div class="form-group">
-              <label class="form-label">Discord ID <span style="color:var(--muted);font-weight:400">(17–19 цифр)</span></label>
+              <label class="form-label">Discord ID <span style="color:var(--muted);font-weight:400;text-transform:none">(17–19 цифр)</span></label>
               <input class="form-input" id="discordIdInput" placeholder="123456789012345678" maxlength="20" type="text" inputmode="numeric">
             </div>
-            <button class="btn-ghost" onclick="linkDiscord()" style="margin-top:8px">🔗 Привязать по ID</button>
+            <button class="btn-ghost" onclick="linkDiscord()" style="margin-top:8px">🔗 ПРИВЯЗАТЬ ПО ID</button>
           </div>
         </details>
       </div>
     </div>
 
-    <!-- Статистика приёма (для кураторов и администраторов) -->
     <div id="acceptedStatsSection" style="display:none; margin-bottom:28px">
       <div class="section-header" style="margin-top:28px">
         <div class="section-title">📊 СТАТИСТИКА ПРИЁМА</div>
         <span class="section-count" id="acceptedStatsCount"></span>
       </div>
-      <div id="acceptedStatsContainer" style="background:var(--card);border:1px solid var(--border);padding:20px 22px;clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))">
-        <div style="color:var(--muted);font-family:'IBM Plex Mono';font-size:12px">⏳ Загрузка...</div>
+      <div id="acceptedStatsContainer" style="background:var(--card);border:1px solid var(--border);padding:22px 24px;border-radius:14px">
+        <div style="color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:12px">⏳ Загрузка...</div>
       </div>
     </div>
 
-    <!-- Tasks section -->
     <div class="section-header">
       <div class="section-title">МОИ ЗАДАНИЯ</div>
       <span class="section-count" id="sectionCount"></span>
@@ -402,7 +661,6 @@
 
 </div>
 
-<!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
@@ -410,7 +668,7 @@ let authToken = localStorage.getItem('authToken');
 let authUser  = JSON.parse(localStorage.getItem('authUser') || 'null');
 let allTasks  = [];
 let taskFilter = 'all';
-let currentDiscordId = null; // FIX: completedBy stores discordId, not login
+let currentDiscordId = null;
 
 function esc(str) {
   return String(str||'').replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
@@ -425,7 +683,6 @@ function showToast(msg, type = 'green') {
 async function init() {
   if (!authToken) { showAuthWall(); return; }
 
-  // Verify token
   try {
     const r = await fetch('/api/auth/me', {headers:{'x-token':authToken}});
     if (!r.ok) { showAuthWall(); return; }
@@ -435,11 +692,9 @@ async function init() {
     if (!['recruiter', 'admin'].includes(d.role)) { showAuthWall(); return; }
   } catch { showAuthWall(); return; }
 
-  // Show cabinet
   document.getElementById('authWall').style.display = 'none';
   document.getElementById('cabinetContent').style.display = 'block';
 
-  // Set profile
   const initials = authUser.login.slice(0, 2).toUpperCase();
   document.getElementById('profileAvatar').textContent = initials;
   document.getElementById('profileLogin').textContent = authUser.login.toUpperCase();
@@ -449,14 +704,12 @@ async function init() {
   loadAcceptedStats();
 }
 
-// ── Discord привязка ──────────────────────────────────────
-
 async function loadDiscordStatus() {
   try {
     const r = await fetch('/api/auth/discord-status', {headers:{'x-token':authToken}});
     const d = await r.json();
     if (d.linked && d.discordId) {
-      currentDiscordId = d.discordId; // FIX: save for completedBy checks
+      currentDiscordId = d.discordId;
       document.getElementById('discordLinked').style.display = 'block';
       document.getElementById('discordUnlinked').style.display = 'none';
       document.getElementById('discordIdDisplay').textContent = d.discordId;
@@ -465,9 +718,8 @@ async function loadDiscordStatus() {
       document.getElementById('discordLinked').style.display = 'none';
       document.getElementById('discordUnlinked').style.display = 'block';
     }
-    // Re-render tasks now that we know discordId
     if (allTasks.length) { updateStats(); renderTasks(); }
-  } catch { /* тихо */ }
+  } catch { }
 }
 
 async function linkDiscord() {
@@ -484,8 +736,8 @@ async function linkDiscord() {
     const d = await r.json();
     if (!r.ok || d.error) { msgEl.className='modal-msg error'; msgEl.textContent=(d.error||'ОШИБКА').toUpperCase(); return; }
     showToast('✅ Discord привязан!', 'green');
-    await loadDiscordStatus(); // this sets currentDiscordId
-    loadTasks(); // reload — now server returns tasks for linked discord
+    await loadDiscordStatus();
+    loadTasks();
   } catch { msgEl.className='modal-msg error'; msgEl.textContent='ОШИБКА СОЕДИНЕНИЯ'; }
 }
 
@@ -512,14 +764,12 @@ async function unlinkDiscord() {
   if (!confirm('Отвязать Discord от аккаунта?')) return;
   try {
     await fetch('/api/auth/unlink-discord', {method:'POST',headers:{'x-token':authToken}});
-    currentDiscordId = null; // BUG FIX: clear immediately so tasks hide right away
+    currentDiscordId = null;
     showToast('Discord отвязан', 'green');
     loadDiscordStatus();
-    loadTasks(); // reload — server now returns [] without discord
-  } catch { showToast('Ошибка', 'red'); }
+    loadTasks();
+  } catch { showToast('Ошибка', 'blue'); }
 }
-
-
 
 function showAuthWall() {
   document.getElementById('authWall').style.display = 'block';
@@ -527,7 +777,6 @@ function showAuthWall() {
 }
 
 async function loadAcceptedStats() {
-  // Показываем блок только для admin (куратора определяем по ответу сервера)
   const section = document.getElementById('acceptedStatsSection');
   const container = document.getElementById('acceptedStatsContainer');
   const countEl = document.getElementById('acceptedStatsCount');
@@ -535,7 +784,6 @@ async function loadAcceptedStats() {
   try {
     const r = await fetch('/api/admin/accepted-stats', {headers:{'x-token':authToken}});
     if (!r.ok) {
-      // Нет доступа — скрываем блок (рядовой рекрут)
       section.style.display = 'none';
       return;
     }
@@ -543,7 +791,7 @@ async function loadAcceptedStats() {
     section.style.display = 'block';
 
     if (!stats.length) {
-      container.innerHTML = '<div style="color:var(--muted);font-family:\'IBM Plex Mono\';font-size:12px">Нет данных</div>';
+      container.innerHTML = '<div style="color:var(--muted);font-family:\'JetBrains Mono\',monospace;font-size:12px">Нет данных</div>';
       return;
     }
 
@@ -552,39 +800,39 @@ async function loadAcceptedStats() {
     countEl.textContent = `${totalAccepted} принято всего`;
 
     const rows = stats.map((rec, i) => {
-      const medal = medals[i] || `<span style="color:var(--muted);font-family:'IBM Plex Mono'">${i+1}.</span>`;
+      const medal = medals[i] || `<span style="color:var(--muted);font-family:'JetBrains Mono',monospace">${i+1}.</span>`;
       const bar = rec.totalAccepted > 0
-        ? `<div style="height:4px;background:rgba(168,85,247,0.15);border-radius:2px;margin-top:6px"><div style="height:4px;background:#a855f7;border-radius:2px;width:${Math.min(100, Math.round(rec.totalAccepted / Math.max(...stats.map(s=>s.totalAccepted)) * 100))}%"></div></div>`
+        ? `<div style="height:5px;background:rgba(179,155,255,0.15);border-radius:99px;margin-top:6px;overflow:hidden"><div style="height:100%;background:linear-gradient(90deg,#b39bff,#8b5cf6);border-radius:99px;width:${Math.min(100, Math.round(rec.totalAccepted / Math.max(...stats.map(s=>s.totalAccepted)) * 100))}%;box-shadow:0 0 8px rgba(179,155,255,0.4)"></div></div>`
         : '';
       return `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:12px">
-          <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);gap:12px">
+          <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
             <span style="font-size:18px;flex-shrink:0">${medal}</span>
-            <div style="min-width:0">
-              <div style="font-family:'IBM Plex Mono';font-size:13px;font-weight:600;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(rec.displayName)}</div>
+            <div style="min-width:0;flex:1">
+              <div style="font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--white);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(rec.displayName)}</div>
               ${bar}
             </div>
           </div>
-          <div style="display:flex;gap:14px;flex-shrink:0;font-family:'IBM Plex Mono';font-size:12px;text-align:right">
+          <div style="display:flex;gap:18px;flex-shrink:0;text-align:right">
             <div>
-              <div style="color:#4ade80;font-size:16px;font-weight:700">${rec.totalAccepted}</div>
-              <div style="color:var(--muted);font-size:10px;letter-spacing:1px">ПРИНЯТО</div>
+              <div style="color:#5dffa7;font-size:18px;font-weight:600;font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em">${rec.totalAccepted}</div>
+              <div style="color:var(--muted);font-size:9px;letter-spacing:1.2px;font-family:'JetBrains Mono',monospace">ПРИНЯТО</div>
             </div>
             <div>
-              <div style="color:#f87171;font-size:16px;font-weight:700">${rec.totalRejected||0}</div>
-              <div style="color:var(--muted);font-size:10px;letter-spacing:1px">ОТКЛ.</div>
+              <div style="color:#ff8088;font-size:18px;font-weight:600;font-family:'Space Grotesk',sans-serif;letter-spacing:-0.01em">${rec.totalRejected||0}</div>
+              <div style="color:var(--muted);font-size:9px;letter-spacing:1.2px;font-family:'JetBrains Mono',monospace">ОТКЛ.</div>
             </div>
           </div>
         </div>`;
     }).join('');
 
     container.innerHTML = `
-      <div style="font-family:'IBM Plex Mono';font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px">
-        Статистика по принятым заявкам · кто принял сколько людей
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px">
+        Кто принял сколько людей
       </div>
       ${rows}
-      <div style="margin-top:12px;font-family:'IBM Plex Mono';font-size:11px;color:var(--muted)">
-        Итого принято: <b style="color:#a855f7">${totalAccepted}</b>
+      <div style="margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.3px">
+        Итого принято: <b style="color:var(--purple);font-size:14px">${totalAccepted}</b>
       </div>`;
   } catch (e) {
     section.style.display = 'none';
@@ -636,7 +884,6 @@ function renderTasks() {
   document.getElementById('sectionCount').textContent = tasks.length + ' заданий';
 
   if (!tasks.length) {
-    // BUG FIX: if no discord linked, tasks are hidden server-side — show clear reason
     if (!currentDiscordId) {
       container.innerHTML = `<div class="empty-tasks"><div class="icon">🔗</div>Привяжи Discord выше, чтобы видеть задания</div>`;
       return;
@@ -661,10 +908,10 @@ function renderTasks() {
       const dl = new Date(t.deadline);
       const hoursLeft = Math.round((dl - Date.now()) / 36e5);
       const dlStr = dl.toLocaleString('ru', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
-      const urgencyColor = hoursLeft <= 6 ? '#ef4444' : hoursLeft <= 24 ? '#f59e0b' : '#60a5fa';
+      const urgencyColor = hoursLeft <= 6 ? '#ff4d5f' : hoursLeft <= 24 ? '#f4a261' : '#7dadff';
       const urgencyIcon  = hoursLeft <= 6 ? '🔴' : hoursLeft <= 24 ? '🟡' : '⏰';
       if (!isDone) {
-        deadlineHtml = `<span style="font-size:11px;color:${urgencyColor};font-family:'IBM Plex Mono',monospace;">${urgencyIcon} Дедлайн: ${dlStr} (~${hoursLeft}ч.)</span>`;
+        deadlineHtml = `<span style="font-size:11px;color:${urgencyColor};font-family:'JetBrains Mono',monospace;letter-spacing:0.3px">${urgencyIcon} Дедлайн: ${dlStr} (~${hoursLeft}ч.)</span>`;
       }
     }
 
@@ -702,11 +949,9 @@ async function toggleTask(id, isDone) {
     }
     const updated = await r.json();
 
-    // Update local data
     const idx = allTasks.findIndex(t => t.id === id);
     if (idx !== -1) allTasks[idx] = updated;
 
-    // Animate check
     const chk = document.getElementById('chk-' + id);
     if (chk) { chk.classList.add('pop'); setTimeout(() => chk.classList.remove('pop'), 300); }
 
